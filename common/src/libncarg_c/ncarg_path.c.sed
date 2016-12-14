@@ -132,13 +132,13 @@ const char
 					pw = getpwuid(getuid());
 
 				if(pw == NULL){
-					endpwent();
 					ESprintf(E_UNKNOWN,
 						"Unable to Resolve \'~\' in %s",
 								rawfname);
-					return(NULL);
+					strcat(fname,piece);
+				} else {
+					strcat(fname,pw->pw_dir);
 				}
-				strcat(fname,pw->pw_dir);
 				endpwent();
 
 				break;
@@ -155,7 +155,7 @@ const char
 					ESprintf(E_UNKNOWN,
 						"Unable to Resolve %s in %s",
 								piece,rawfname);
-					return(NULL);
+					cs = "";
 				}
 				strcat(fname,cs);
 
