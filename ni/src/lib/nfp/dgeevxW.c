@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "wrapper.h"
 
-extern void NGCALLF(dgeevxint,DGEEVXINT)(char *, char *, char *, char *, 
-                                         int *, double *, double *, double *, 
-                                         double *, logical *, double *, int *, 
+extern void NGCALLF(dgeevxint,DGEEVXINT)(char *, char *, char *, char *, int *,
+                                         double *, double *, double *, double *,
+                                         logical *, double *, int *, double *,
                                          double *, double *, double *, double *,
                                          double *, int *, int *,int,int,int,int);
 
@@ -32,8 +32,8 @@ NhlErrorTypes dgeevx_lapack_W( void )
 /*
  * Return variable
  */
-  void *evlr, *wr, *wi, *vl, *vr, *rconde, *rcondv, *scalem;
-  double *tmp_evlr, *tmp_wr, *tmp_wi, *tmp_vl, *tmp_vr, *tmp_rconde, *tmp_rcondv, *tmp_scalem;
+  void *evlr, *wr, *wi, *vl, *vr, *rconde, *rcondv, *scalem, *abnrm;
+  double *tmp_evlr, *tmp_wr, *tmp_wi, *tmp_vl, *tmp_vr, *tmp_rconde, *tmp_rcondv, *tmp_scalem, *tmp_abnrm;
   int ndims_evlr;
   ng_size_t *dsizes_evlr;
   NclBasicDataTypes type_evlr;
@@ -230,6 +230,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
     rconde       = (void *)calloc(N, sizeof(float));
     rcondv       = (void *)calloc(N, sizeof(float));
     scalem       = (void *)calloc(N, sizeof(float));
+    abnrm        = (void *)calloc(1, sizeof(float));
     tmp_evlr     = (double *)calloc(Nsqr4,sizeof(double));
     tmp_wr       = (double *)calloc(N,sizeof(double));
     tmp_wi       = (double *)calloc(N,sizeof(double));
@@ -238,10 +239,12 @@ NhlErrorTypes dgeevx_lapack_W( void )
     tmp_rconde   = (double *)calloc(N, sizeof(double));
     tmp_rcondv   = (double *)calloc(N, sizeof(double));
     tmp_scalem   = (double *)calloc(N, sizeof(double));
+    tmp_abnrm    = (double *)calloc(1, sizeof(double));
     if(evlr   == NULL || tmp_evlr   == NULL || wr     == NULL || tmp_wr     == NULL ||
        wi     == NULL || tmp_wi     == NULL || vl     == NULL || tmp_vl     == NULL ||
        vr     == NULL || tmp_vr     == NULL || rconde == NULL || tmp_rconde == NULL ||
-       rcondv == NULL || tmp_rcondv == NULL || scalem == NULL || tmp_scalem == NULL) {
+       rcondv == NULL || tmp_rcondv == NULL || scalem == NULL || tmp_scalem == NULL ||
+       abnrm  == NULL || tmp_abnrm  == NULL) {
       NhlPError(NhlFATAL,NhlEUNKNOWN,"dgeevx_lapack: Unable to allocate memory for output arrays");
       return(NhlFATAL);
     }
@@ -256,8 +259,8 @@ NhlErrorTypes dgeevx_lapack_W( void )
     rcondv = (void *)calloc(N, sizeof(double));
     scalem = (void *)calloc(N, sizeof(double));
     abnrm  = (void *)calloc(1, sizeof(double));
-    if(evlr   == NULL || wr     == NULL || wi     == NULL || vl == NULL || vr == NULL ||
-       rconde == NULL || rcondv == NULL || scalem == NULL) {
+    if(evlr   == NULL || wr     == NULL || wi     == NULL || vl    == NULL || vr == NULL ||
+       rconde == NULL || rcondv == NULL || scalem == NULL || abnrm == NULL) {
       NhlPError(NhlFATAL,NhlEUNKNOWN,"dgeevx_lapack: Unable to allocate memory for output arrays");
       return(NhlFATAL);
     }
@@ -269,6 +272,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
     tmp_rconde = &((double*)rconde)[0];
     tmp_rcondv = &((double*)rcondv)[0];
     tmp_scalem = &((double*)scalem)[0];
+    tmp_abnrm  = &((double*)abnrm)[0];
   }
 
 /* 
@@ -302,7 +306,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
   NGCALLF(dgeevxint,DGEEVXINT)(sbalanc, sjobvl, sjobvr, ssense, &iN,
                                tmp_Q, tmp_evlr, tmp_wr, tmp_wi, opt, work,
                                iwork, tmp_scalem, tmp_rconde, tmp_rcondv,
-                               tmp_vl, tmp_vr, &ilwork, &iliwork,
+                               tmp_vl, tmp_vr, tmp_abnrm, &ilwork, &iliwork,
                                strlen(sbalanc),strlen(sjobvl),
                                strlen(sjobvr), strlen(ssense));
   if(type_Q != NCL_double) {
@@ -315,6 +319,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
     coerce_output_float_only(rconde,tmp_rconde,N,0);
     coerce_output_float_only(rcondv,tmp_rcondv,N,0);
     coerce_output_float_only(scalem,tmp_scalem,N,0);
+    coerce_output_float_only(abnrm,tmp_abnrm,1,0);
   }
 /*
  * Free unneeded memory.
@@ -329,6 +334,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
     NclFree(tmp_rconde);
     NclFree(tmp_rcondv);
     NclFree(tmp_scalem);
+    NclFree(tmp_abnrm);
   }
   NclFree(work);
   NclFree(iwork);
@@ -456,6 +462,27 @@ NhlErrorTypes dgeevx_lapack_W( void )
   _NclAddAtt(
              att_id,
              "scale",
+             att_md,
+             NULL
+             );
+
+  dsizes[0] = 1;
+  att_md = _NclCreateVal(
+                         NULL,
+                         NULL,
+                         Ncl_MultiDValData,
+                         0,
+                         abnrm,
+                         NULL,
+                         1,
+                         dsizes,
+                         TEMPORARY,
+                         NULL,
+                         type_obj_evlr
+                         );
+  _NclAddAtt(
+             att_id,
+             "abnrm",
              att_md,
              NULL
              );

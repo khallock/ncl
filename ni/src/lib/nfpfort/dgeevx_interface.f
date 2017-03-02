@@ -1,7 +1,7 @@
 C NCLFORTSTART
       SUBROUTINE dgeevxint(BALANC,JOBVL,JOBVR,SENSE,N,A,EVLR,WR,WI,
      +                     OPT,WORK,IWORK,SCALEM,RCONDE,RCONDV,VL,VR,
-     +                     LWORK,LIWORK)
+     +                     ABNRM,LWORK,LIWORK)
       IMPLICIT NONE
 c                                                      input
       INTEGER           N, OPT
@@ -22,6 +22,7 @@ c
       DOUBLE PRECISION SCALEM(N), RCONDE(N), RCONDV(N)
       DOUBLE PRECISION VL(N,N), VR(N,N)
       DOUBLE PRECISION WORK(LWORK)
+      DOUBLE PRECISION ABNRM
       INTEGER          IWORK(LIWORK)
 C NCLEND
 C --------------------------------------------------------------------------------
@@ -29,7 +30,6 @@ C                                                      local dynamically allocat
       INTEGER LDA, ILO, IHI, INFO, I, J
      +      , LDVR, LDVL, K , KP1
 C    +      , LDVR, LDVL, LWORK, LIWORK, K , KP1
-      DOUBLE PRECISION ABNRM
 
 C just for consistency with LAPACK description   (make large)
       LDA     = N
