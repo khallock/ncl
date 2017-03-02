@@ -228,8 +228,8 @@ NhlErrorTypes dgeevx_lapack_W( void )
     vl       = (void *)calloc(Nsqr, sizeof(float));
     vr       = (void *)calloc(Nsqr, sizeof(float));
     tmp_evlr = (double *)calloc(Nsqr4,sizeof(double));
-    tmp_wr   = (double *)calloc(Nsqr4,sizeof(double));
-    tmp_wi   = (double *)calloc(Nsqr4,sizeof(double));
+    tmp_wr   = (double *)calloc(N,sizeof(double));
+    tmp_wi   = (double *)calloc(N,sizeof(double));
     tmp_vl   = (double *)calloc(Nsqr, sizeof(double));
     tmp_vr   = (double *)calloc(Nsqr, sizeof(double));
     if(evlr == NULL || tmp_evlr == NULL || wr   == NULL || tmp_wr == NULL ||
