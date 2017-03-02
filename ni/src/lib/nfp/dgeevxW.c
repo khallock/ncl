@@ -32,8 +32,8 @@ NhlErrorTypes dgeevx_lapack_W( void )
 /*
  * Return variable
  */
-  void *evlr, *wr, *wi, *vl, *vr;
-  double *tmp_evlr, *tmp_wr, *tmp_wi, *tmp_vl, *tmp_vr;
+  void *evlr, *wr, *wi, *vl, *vr, *rconde, *rcondv;
+  double *tmp_evlr, *tmp_wr, *tmp_wi, *tmp_vl, *tmp_vr, *tmp_rconde, *tmp_rcondv;
   int ndims_evlr;
   ng_size_t *dsizes_evlr;
   NclBasicDataTypes type_evlr;
@@ -50,7 +50,7 @@ NhlErrorTypes dgeevx_lapack_W( void )
  * Various
  */
   ng_size_t N, Nsqr, Nsqr4, lwork, liwork; 
-  double *work, *scalem, *rconde, *rcondv;
+  double *work, *scalem;
   int *iwork, iN, ilwork, iliwork;
 
 /*
@@ -222,51 +222,58 @@ NhlErrorTypes dgeevx_lapack_W( void )
  * Allocate space for output arrays.
  */
   if(type_evlr != NCL_double) {
-    evlr     = (void *)calloc(Nsqr4, sizeof(float));
-    wr       = (void *)calloc(N, sizeof(float));
-    wi       = (void *)calloc(N, sizeof(float));
-    vl       = (void *)calloc(Nsqr, sizeof(float));
-    vr       = (void *)calloc(Nsqr, sizeof(float));
-    tmp_evlr = (double *)calloc(Nsqr4,sizeof(double));
-    tmp_wr   = (double *)calloc(N,sizeof(double));
-    tmp_wi   = (double *)calloc(N,sizeof(double));
-    tmp_vl   = (double *)calloc(Nsqr, sizeof(double));
-    tmp_vr   = (double *)calloc(Nsqr, sizeof(double));
-    if(evlr == NULL || tmp_evlr == NULL || wr   == NULL || tmp_wr == NULL ||
-       wi   == NULL || tmp_wi   == NULL || vl   == NULL || tmp_vl == NULL ||
-       vr   == NULL || tmp_vr   == NULL) {
+    evlr       = (void *)calloc(Nsqr4, sizeof(float));
+    wr         = (void *)calloc(N, sizeof(float));
+    wi         = (void *)calloc(N, sizeof(float));
+    vl         = (void *)calloc(Nsqr, sizeof(float));
+    vr         = (void *)calloc(Nsqr, sizeof(float));
+    rconde     = (void *)calloc(N, sizeof(float));
+    rcondv     = (void *)calloc(N, sizeof(float));
+    tmp_evlr   = (double *)calloc(Nsqr4,sizeof(double));
+    tmp_wr     = (double *)calloc(N,sizeof(double));
+    tmp_wi     = (double *)calloc(N,sizeof(double));
+    tmp_vl     = (double *)calloc(Nsqr, sizeof(double));
+    tmp_vr     = (double *)calloc(Nsqr, sizeof(double));
+    tmp_rconde = (double *)calloc(N, sizeof(double));
+    tmp_rcondv = (double *)calloc(N, sizeof(double));
+    if(evlr   == NULL || tmp_evlr   == NULL || wr     == NULL || tmp_wr     == NULL ||
+       wi     == NULL || tmp_wi     == NULL || vl     == NULL || tmp_vl     == NULL ||
+       vr     == NULL || tmp_vr     == NULL || rconde == NULL || tmp_rconde == NULL ||
+       rcondv == NULL || tmp_rcondv == NULL) {
       NhlPError(NhlFATAL,NhlEUNKNOWN,"dgeevx_lapack: Unable to allocate memory for output arrays");
       return(NhlFATAL);
     }
   }
   else {
-    evlr = (void *)calloc(Nsqr4,sizeof(double));
-    wr   = (void *)calloc(N, sizeof(double));
-    wi   = (void *)calloc(N, sizeof(double));
-    vl   = (void *)calloc(Nsqr, sizeof(double));
-    vr   = (void *)calloc(Nsqr, sizeof(double));
-    if(evlr == NULL || wr == NULL || wi == NULL || vl == NULL || vr == NULL) {
+    evlr   = (void *)calloc(Nsqr4,sizeof(double));
+    wr     = (void *)calloc(N, sizeof(double));
+    wi     = (void *)calloc(N, sizeof(double));
+    vl     = (void *)calloc(Nsqr, sizeof(double));
+    vr     = (void *)calloc(Nsqr, sizeof(double));
+    rconde = (void *)calloc(N, sizeof(double));
+    rcondv = (void *)calloc(N, sizeof(double));
+    if(evlr   == NULL || wr     == NULL || wi == NULL || vl == NULL || vr == NULL ||
+       rconde == NULL || rcondv == NULL) {
       NhlPError(NhlFATAL,NhlEUNKNOWN,"dgeevx_lapack: Unable to allocate memory for output arrays");
       return(NhlFATAL);
     }
-    tmp_evlr = &((double*)evlr)[0];
-    tmp_wr   = &((double*)wr)[0];
-    tmp_wi   = &((double*)wi)[0];
-    tmp_vl   = &((double*)vl)[0];
-    tmp_vr   = &((double*)vr)[0];
+    tmp_evlr   = &((double*)evlr)[0];
+    tmp_wr     = &((double*)wr)[0];
+    tmp_wi     = &((double*)wi)[0];
+    tmp_vl     = &((double*)vl)[0];
+    tmp_vr     = &((double*)vr)[0];
+    tmp_rconde = &((double*)rconde)[0];
+    tmp_rcondv = &((double*)rcondv)[0];
   }
 
 /* 
  * Allocate space for work arrays.
  */
   scalem = (double *)calloc(N, sizeof(double));
-  rconde = (double *)calloc(N, sizeof(double));
-  rcondv = (double *)calloc(N, sizeof(double));
   work   = (double *)calloc(ilwork, sizeof(double));
   iwork  = (int *)calloc(iliwork, sizeof(int));
 
-  if(scalem == NULL || rconde == NULL || rcondv == NULL || 
-     work == NULL || iwork == NULL) {
+  if(scalem == NULL || work == NULL || iwork == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dgeevx_lapack: Unable to allocate memory for work arrays");
       return(NhlFATAL);
   }
@@ -288,11 +295,11 @@ NhlErrorTypes dgeevx_lapack_W( void )
 /*
  * Call the Fortran routine.
  */
-  NGCALLF(dgeevxint,DGEEVXINT)(sbalanc, sjobvl, sjobvr, ssense, &iN, 
-                               tmp_Q, tmp_evlr, tmp_wr, tmp_wi, opt, work, 
-                               iwork, scalem, rconde, rcondv, 
+  NGCALLF(dgeevxint,DGEEVXINT)(sbalanc, sjobvl, sjobvr, ssense, &iN,
+                               tmp_Q, tmp_evlr, tmp_wr, tmp_wi, opt, work,
+                               iwork, scalem, tmp_rconde, tmp_rcondv,
                                tmp_vl, tmp_vr, &ilwork, &iliwork,
-                               strlen(sbalanc),strlen(sjobvl), 
+                               strlen(sbalanc),strlen(sjobvl),
                                strlen(sjobvr), strlen(ssense));
   if(type_Q != NCL_double) {
     coerce_output_float_only(evlr,tmp_evlr,Nsqr4,0);
@@ -301,6 +308,8 @@ NhlErrorTypes dgeevx_lapack_W( void )
     coerce_output_float_only(wi,tmp_wi,N,0);
     coerce_output_float_only(vl,tmp_vl,Nsqr,0);
     coerce_output_float_only(vr,tmp_vr,Nsqr,0);
+    coerce_output_float_only(rconde,tmp_rconde,N,0);
+    coerce_output_float_only(rcondv,tmp_rcondv,N,0);
   }
 /*
  * Free unneeded memory.
@@ -312,10 +321,10 @@ NhlErrorTypes dgeevx_lapack_W( void )
     NclFree(tmp_vl);
     NclFree(tmp_vr);
     NclFree(tmp_evlr);
+    NclFree(tmp_rconde);
+    NclFree(tmp_rcondv);
   }
   NclFree(scalem);
-  NclFree(rconde);
-  NclFree(rcondv);
   NclFree(work);
   NclFree(iwork);
 
@@ -382,6 +391,46 @@ NhlErrorTypes dgeevx_lapack_W( void )
   _NclAddAtt(
              att_id,
              "eigi",
+             att_md,
+             NULL
+             );
+
+  att_md = _NclCreateVal(
+                         NULL,
+                         NULL,
+                         Ncl_MultiDValData,
+                         0,
+                         rconde,
+                         NULL,
+                         1,
+                         dsizes,
+                         TEMPORARY,
+                         NULL,
+                         type_obj_evlr
+                         );
+  _NclAddAtt(
+             att_id,
+             "rconde",
+             att_md,
+             NULL
+             );
+
+  att_md = _NclCreateVal(
+                         NULL,
+                         NULL,
+                         Ncl_MultiDValData,
+                         0,
+                         rcondv,
+                         NULL,
+                         1,
+                         dsizes,
+                         TEMPORARY,
+                         NULL,
+                         type_obj_evlr
+                         );
+  _NclAddAtt(
+             att_id,
+             "rcondv",
              att_md,
              NULL
              );
