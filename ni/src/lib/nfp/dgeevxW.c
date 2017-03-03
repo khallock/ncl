@@ -406,127 +406,139 @@ NhlErrorTypes dgeevx_lapack_W( void )
              NULL
              );
 
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         rconde,
-                         NULL,
-                         1,
-                         dsizes,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "rconde",
-             att_md,
-             NULL
-             );
+  if (strcmp(ssense, "N")) {
+    if (strcmp(ssense, "V")) {
+      att_md = _NclCreateVal(
+                             NULL,
+                             NULL,
+                             Ncl_MultiDValData,
+                             0,
+                             rconde,
+                             NULL,
+                             1,
+                             dsizes,
+                             TEMPORARY,
+                             NULL,
+                             type_obj_evlr
+                             );
+      _NclAddAtt(
+                 att_id,
+                 "rconde",
+                 att_md,
+                 NULL
+                 );
+    }
 
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         rcondv,
-                         NULL,
-                         1,
-                         dsizes,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "rcondv",
-             att_md,
-             NULL
-             );
+    if (strcmp(ssense, "E")) {
+      att_md = _NclCreateVal(
+                             NULL,
+                             NULL,
+                             Ncl_MultiDValData,
+                             0,
+                             rcondv,
+                             NULL,
+                             1,
+                             dsizes,
+                             TEMPORARY,
+                             NULL,
+                             type_obj_evlr
+                             );
+      _NclAddAtt(
+                 att_id,
+                 "rcondv",
+                 att_md,
+                 NULL
+                 );
+    }
+  }
 
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         scalem,
-                         NULL,
-                         1,
-                         dsizes,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "scale",
-             att_md,
-             NULL
-             );
+  if (strcmp(sbalanc, "N")) {
+    att_md = _NclCreateVal(
+                           NULL,
+                           NULL,
+                           Ncl_MultiDValData,
+                           0,
+                           scalem,
+                           NULL,
+                           1,
+                           dsizes,
+                           TEMPORARY,
+                           NULL,
+                           type_obj_evlr
+                           );
+    _NclAddAtt(
+               att_id,
+               "scale",
+               att_md,
+               NULL
+               );
 
-  dsizes[0] = 1;
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         abnrm,
-                         NULL,
-                         1,
-                         dsizes,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "abnrm",
-             att_md,
-             NULL
-             );
+    dsizes[0] = 1;
+    att_md = _NclCreateVal(
+                           NULL,
+                           NULL,
+                           Ncl_MultiDValData,
+                           0,
+                           abnrm,
+                           NULL,
+                           1,
+                           dsizes,
+                           TEMPORARY,
+                           NULL,
+                           type_obj_evlr
+                           );
+    _NclAddAtt(
+               att_id,
+               "abnrm",
+               att_md,
+               NULL
+               );
+  }
 
   dsizes2[0] = dsizes2[1] = N;
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         vl,
-                         NULL,
-                         2,
-                         dsizes2,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "eigleft",
-             att_md,
-             NULL
-             );
+  if (strcmp(sjobvl, "N")) {
+    att_md = _NclCreateVal(
+                           NULL,
+                           NULL,
+                           Ncl_MultiDValData,
+                           0,
+                           vl,
+                           NULL,
+                           2,
+                           dsizes2,
+                           TEMPORARY,
+                           NULL,
+                           type_obj_evlr
+                           );
+    _NclAddAtt(
+               att_id,
+               "eigleft",
+               att_md,
+               NULL
+               );
+  }
 
-  att_md = _NclCreateVal(
-                         NULL,
-                         NULL,
-                         Ncl_MultiDValData,
-                         0,
-                         vr,
-                         NULL,
-                         2,
-                         dsizes2,
-                         TEMPORARY,
-                         NULL,
-                         type_obj_evlr
-                         );
-  _NclAddAtt(
-             att_id,
-             "eigright",
-             att_md,
-             NULL
-             );
+  if (strcmp(sjobvr, "N")) {
+    att_md = _NclCreateVal(
+                           NULL,
+                           NULL,
+                           Ncl_MultiDValData,
+                           0,
+                           vr,
+                           NULL,
+                           2,
+                           dsizes2,
+                           TEMPORARY,
+                           NULL,
+                           type_obj_evlr
+                           );
+    _NclAddAtt(
+               att_id,
+               "eigright",
+               att_md,
+               NULL
+               );
+  }
 
   tmp_var = _NclVarCreate(
                           NULL,
