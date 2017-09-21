@@ -520,6 +520,11 @@ C
 C NDPC is the number of the character in the DPC collating sequence.
 C
       NDPC=IDPC(NCOL)
+C If NDPC is lower case but ICSE is ICSU, convert NDPC to upper
+      IF (ICSP.EQ.ICSL.AND.ICSE.EQ.ICSU.AND.NDPC.GE.48.AND.
+     +    NDPC.LE.73) THEN
+        NDPC=NDPC-47
+      END IF
 C
 C If function codes are being processed, jump to the function code
 C processor.
