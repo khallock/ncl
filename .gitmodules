@@ -1,0 +1,3 @@
+[submodule "ni/src/contrib"]
+	path = ni/src/contrib
+	url = https://github.com/khallock/ncl_contrib.git
