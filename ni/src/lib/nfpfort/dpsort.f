@@ -5,14 +5,15 @@ C      iperm same size as dx
 
       implicit none
 c input
-      integer  ndim, kflag, ier
+      integer*8  ndim
+      integer  kflag, ier
       double   precision dx(ndim)
 c output
-      integer  iperm(ndim)
+      integer*8  iperm(ndim)
 C NCLEND
 
 c local
-      integer  n
+      integer*8  n
 
       call dpsort(dx, ndim, iperm, kflag, ier)
 
@@ -98,16 +99,18 @@ C   920818  Declarations section rebuilt and code restructured to use
 C           IF-THEN-ELSE-ENDIF.  (SMR, WRB)
 C***END PROLOGUE  DPSORT
 C     .. Scalar Arguments ..
-      INTEGER    IER, KFLAG, N
+      INTEGER*8  N
+      INTEGER    IER, KFLAG
 C     .. Array Arguments ..
       DOUBLE PRECISION    DX(*)
-      INTEGER    IPERM(*)
+      INTEGER*8    IPERM(*)
 
 C     .. Local Scalars ..
       DOUBLE PRECISION    R, TEMP
-      INTEGER    I, IJ, INDX, INDX0, ISTRT, J, K, KK, L, LM, LMT, M, NN
+      INTEGER    KK, M
+      INTEGER*8  I, IJ, INDX, INDX0, ISTRT, J, K, L, LM, LMT, NN
 C     .. Local Arrays ..
-      INTEGER    IL(21), IU(21)
+      INTEGER*8    IL(21), IU(21)
 C     .. External Subroutines ..
 C DJS EXTERNAL    XERMSG
 C     .. Intrinsic Functions ..

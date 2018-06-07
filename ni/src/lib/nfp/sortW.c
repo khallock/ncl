@@ -3,7 +3,7 @@
 #include <math.h>
 #include "wrapper.h"
 
-extern void NGCALLF(dpsortdriver,DPSORTDRIVER)(double*, int*, int*, 
+extern void NGCALLF(dpsortdriver,DPSORTDRIVER)(double*, ng_size_t*, ng_size_t*,
                                                int*,int*);
 
 NhlErrorTypes dim_pqsort_W( void )
@@ -22,13 +22,13 @@ NhlErrorTypes dim_pqsort_W( void )
 /*
  * Output array variables
  */
-  int *iperm;
+  ng_size_t *iperm;
 /*
  * various
  */
   ng_size_t index_x, ndim;
   ng_size_t i, j, total_elements;
-  int ier = 0, indim;
+  int ier = 0;
 /*
  * Retrieve parameter.
  */
@@ -80,11 +80,13 @@ NhlErrorTypes dim_pqsort_W( void )
 /*
  * Test dimension sizes.
  */
+/*
   if(ndim > INT_MAX) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: one or more input dimensions sizes are greater than INT_MAX");
     return(NhlFATAL);
   }
   indim = (int) ndim;
+*/
 
 /*
  * Coerce missing values, if any.
@@ -100,7 +102,7 @@ NhlErrorTypes dim_pqsort_W( void )
       return(NhlFATAL);
     }
   }
-  iperm = (int*)calloc(ndim*total_elements,sizeof(int));
+  iperm = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
   if (iperm == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: Unable to allocate memory for output array" );
     return(NhlFATAL);
@@ -121,7 +123,7 @@ NhlErrorTypes dim_pqsort_W( void )
       tmp_x = &((double*)x)[index_x];
     }
 
-    NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&indim,&iperm[index_x],kflag,&ier);
+    NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,&iperm[index_x],kflag,&ier);
 
     if((*kflag ==2 || *kflag == -2) && type_x != NCL_double) {
       if(type_x == NCL_int) {
@@ -147,7 +149,7 @@ NhlErrorTypes dim_pqsort_W( void )
 /*
  * Return.
  */
-  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_int,0));
+  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_long,0));
 }
 
 
@@ -168,13 +170,13 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Output array variables
  */
-  int *iperm, *tmp_iperm;
+  ng_size_t *iperm, *tmp_iperm;
 /*
  * various
  */
   ng_size_t index_x, ndim;
   ng_size_t i, j, k, inr, total_nl, total_nr, total_elements;
-  int ier = 0, indim;
+  int ier = 0;
 /*
  * Retrieve parameter.
  */
@@ -245,11 +247,13 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Test dimension sizes.
  */
+/*
   if(ndim > INT_MAX) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: one or more input dimensions sizes are greater than INT_MAX");
     return(NhlFATAL);
   }
   indim = (int) ndim;
+*/
 
 /*
  * Coerce missing values, if any.
@@ -263,8 +267,8 @@ NhlErrorTypes dim_pqsort_n_W( void )
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: Unable to allocate memory for input array");
     return(NhlFATAL);
   }
-  tmp_iperm = (int*)calloc(ndim,sizeof(int));
-  iperm     = (int*)calloc(ndim*total_elements,sizeof(int));
+  tmp_iperm = (ng_size_t*)calloc(ndim,sizeof(ng_size_t));
+  iperm     = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
   if (iperm == NULL || tmp_iperm == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: Unable to allocate memory for output array" );
     return(NhlFATAL);
@@ -282,7 +286,7 @@ NhlErrorTypes dim_pqsort_n_W( void )
       index_x = inr + j;
       coerce_subset_input_double_step(x,tmp_x,index_x,total_nr,type_x,ndim,
                                       0,NULL,NULL);
-      NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&indim,tmp_iperm,kflag,&ier);
+      NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,tmp_iperm,kflag,&ier);
 
       for(k = 0; k < ndim; k++) {
         index_x = inr + j + (k*total_nr);
@@ -311,5 +315,5 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Return.
  */
-  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_int,0));
+  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_long,0));
 }
