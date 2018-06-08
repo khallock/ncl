@@ -22,7 +22,9 @@ NhlErrorTypes dim_pqsort_W( void )
 /*
  * Output array variables
  */
-  ng_size_t *iperm;
+  void *iperm;
+  ng_size_t *tmp_iperm;
+  NclBasicDataTypes type_iperm = NCL_int;
 /*
  * various
  */
@@ -80,13 +82,9 @@ NhlErrorTypes dim_pqsort_W( void )
 /*
  * Test dimension sizes.
  */
-/*
   if(ndim > INT_MAX) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: one or more input dimensions sizes are greater than INT_MAX");
-    return(NhlFATAL);
+    type_iperm = NCL_long;
   }
-  indim = (int) ndim;
-*/
 
 /*
  * Coerce missing values, if any.
@@ -102,8 +100,15 @@ NhlErrorTypes dim_pqsort_W( void )
       return(NhlFATAL);
     }
   }
-  iperm = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
-  if (iperm == NULL) {
+
+  tmp_iperm = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
+  if(type_iperm == NCL_int) {
+    iperm     = (void*)calloc(ndim*total_elements,sizeof(int));
+  } else {
+    iperm     = (void*)tmp_iperm;
+  }
+
+  if (iperm == NULL || tmp_iperm == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: Unable to allocate memory for output array" );
     return(NhlFATAL);
   }
@@ -123,7 +128,8 @@ NhlErrorTypes dim_pqsort_W( void )
       tmp_x = &((double*)x)[index_x];
     }
 
-    NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,&iperm[index_x],kflag,&ier);
+    NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,&tmp_iperm[index_x],kflag,&ier);
+
 
     if((*kflag ==2 || *kflag == -2) && type_x != NCL_double) {
       if(type_x == NCL_int) {
@@ -142,14 +148,20 @@ NhlErrorTypes dim_pqsort_W( void )
     }
     index_x += ndim;
   }
+/* Coerce output permutation vector */
+  if(type_iperm == NCL_int) {
+    for(i = 0; i < ndim*total_elements; i++)
+      ((int*)iperm)[i] = (int)(tmp_iperm[i]);
+  }
 /*
  * Free unneeded memory.
  */
   if(type_x != NCL_double) NclFree(tmp_x);
+  if(type_iperm != NCL_long) NclFree(tmp_iperm);
 /*
  * Return.
  */
-  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_long,0));
+  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,type_iperm,0));
 }
 
 
@@ -170,7 +182,9 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Output array variables
  */
-  ng_size_t *iperm, *tmp_iperm;
+  void *iperm;
+  ng_size_t *tmp_iperm;
+  NclBasicDataTypes type_iperm = NCL_int;
 /*
  * various
  */
@@ -247,13 +261,9 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Test dimension sizes.
  */
-/*
   if(ndim > INT_MAX) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: one or more input dimensions sizes are greater than INT_MAX");
-    return(NhlFATAL);
+    type_iperm = NCL_long;
   }
-  indim = (int) ndim;
-*/
 
 /*
  * Coerce missing values, if any.
@@ -267,8 +277,14 @@ NhlErrorTypes dim_pqsort_n_W( void )
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: Unable to allocate memory for input array");
     return(NhlFATAL);
   }
+
   tmp_iperm = (ng_size_t*)calloc(ndim,sizeof(ng_size_t));
-  iperm     = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
+  if(type_iperm == NCL_int) {
+    iperm     = (void*)calloc(ndim*total_elements,sizeof(int));
+  } else {
+    iperm     = (void*)calloc(ndim*total_elements,sizeof(ng_size_t));
+  }
+
   if (iperm == NULL || tmp_iperm == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: Unable to allocate memory for output array" );
     return(NhlFATAL);
@@ -290,8 +306,14 @@ NhlErrorTypes dim_pqsort_n_W( void )
 
       for(k = 0; k < ndim; k++) {
         index_x = inr + j + (k*total_nr);
-
-        iperm[index_x] = tmp_iperm[k]; /* Output permutation vector */
+/*
+ * Coerce output permutation vector
+ */
+        if(type_iperm == NCL_int) {
+            ((int*)iperm)[index_x] = (int)(tmp_iperm[k]);
+        } else {
+            ((ng_size_t*)iperm)[index_x] = tmp_iperm[k];
+        }
 
         if(*kflag ==2 || *kflag == -2) {
 /*
@@ -315,5 +337,5 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Return.
  */
-  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,NCL_long,0));
+  return(NclReturnValue(iperm,ndims_x,dsizes_x,NULL,type_iperm,0));
 }
