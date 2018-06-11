@@ -3,8 +3,10 @@
 #include <math.h>
 #include "wrapper.h"
 
-extern void NGCALLF(dpsortdriver,DPSORTDRIVER)(double*, ng_size_t*, ng_size_t*,
+extern void NGCALLF(dpsortdriver,DPSORTDRIVER)(double*, int*, int*, 
                                                int*,int*);
+extern void NGCALLF(dpsortlargedriver,DPSORTLARGEDRIVER)(double*, ng_size_t*,
+                                               ng_size_t*, int*,int*);
 
 NhlErrorTypes dim_pqsort_W( void )
 {
@@ -23,14 +25,13 @@ NhlErrorTypes dim_pqsort_W( void )
  * Output array variables
  */
   void *iperm;
-  ng_size_t *tmp_iperm;
   NclBasicDataTypes type_iperm = NCL_int;
 /*
  * various
  */
   ng_size_t index_x, ndim;
   ng_size_t i, j, total_elements;
-  int ier = 0;
+  int ier = 0, indim;
 /*
  * Retrieve parameter.
  */
@@ -83,8 +84,15 @@ NhlErrorTypes dim_pqsort_W( void )
  * Test dimension sizes.
  */
   if(ndim > INT_MAX) {
+#ifdef NG32BIT
+    /* This code should be impossible to reach as ng_size_t IS an int on 32-bit systems */
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: dimensions sizes greater than INT_MAX (%d) are not supported on 32-bit systems", INT_MAX);
+    return(NhlFATAL);
+#else
     type_iperm = NCL_long;
+#endif
   }
+  indim = (int) ndim;
 
 /*
  * Coerce missing values, if any.
@@ -101,14 +109,13 @@ NhlErrorTypes dim_pqsort_W( void )
     }
   }
 
-  tmp_iperm = (ng_size_t*)calloc(ndim*total_elements,sizeof(ng_size_t));
   if(type_iperm == NCL_int) {
-    iperm     = (void*)calloc(ndim*total_elements,sizeof(int));
+    iperm = (void*)calloc(ndim*total_elements,sizeof(int));
   } else {
-    iperm     = (void*)tmp_iperm;
+    iperm = (void*)calloc(ndim*total_elements,sizeof(ng_size_t));
   }
 
-  if (iperm == NULL || tmp_iperm == NULL) {
+  if (iperm == NULL) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort: Unable to allocate memory for output array" );
     return(NhlFATAL);
   }
@@ -128,7 +135,11 @@ NhlErrorTypes dim_pqsort_W( void )
       tmp_x = &((double*)x)[index_x];
     }
 
-    NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,&tmp_iperm[index_x],kflag,&ier);
+    if(type_iperm == NCL_int) {
+      NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&indim,&((int*)iperm)[index_x],kflag,&ier);
+    } else {
+      NGCALLF(dpsortlargedriver,DPSORTLARGEDRIVER)(tmp_x,&ndim,&((ng_size_t*)iperm)[index_x],kflag,&ier);
+    }
 
 
     if((*kflag ==2 || *kflag == -2) && type_x != NCL_double) {
@@ -148,16 +159,10 @@ NhlErrorTypes dim_pqsort_W( void )
     }
     index_x += ndim;
   }
-/* Coerce output permutation vector */
-  if(type_iperm == NCL_int) {
-    for(i = 0; i < ndim*total_elements; i++)
-      ((int*)iperm)[i] = (int)(tmp_iperm[i]);
-  }
 /*
  * Free unneeded memory.
  */
   if(type_x != NCL_double) NclFree(tmp_x);
-  if(type_iperm != NCL_long) NclFree(tmp_iperm);
 /*
  * Return.
  */
@@ -182,15 +187,14 @@ NhlErrorTypes dim_pqsort_n_W( void )
 /*
  * Output array variables
  */
-  void *iperm;
-  ng_size_t *tmp_iperm;
+  void *iperm, *tmp_iperm;
   NclBasicDataTypes type_iperm = NCL_int;
 /*
  * various
  */
   ng_size_t index_x, ndim;
   ng_size_t i, j, k, inr, total_nl, total_nr, total_elements;
-  int ier = 0;
+  int ier = 0, indim;
 /*
  * Retrieve parameter.
  */
@@ -262,8 +266,15 @@ NhlErrorTypes dim_pqsort_n_W( void )
  * Test dimension sizes.
  */
   if(ndim > INT_MAX) {
+#ifdef NG32BIT
+    /* This code should be impossible to reach as ng_size_t IS an int on 32-bit systems */
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_pqsort_n: dimensions sizes greater than INT_MAX (%d) are not supported on 32-bit systems", INT_MAX);
+    return(NhlFATAL);
+#else
     type_iperm = NCL_long;
+#endif
   }
+  indim = (int) ndim;
 
 /*
  * Coerce missing values, if any.
@@ -278,10 +289,11 @@ NhlErrorTypes dim_pqsort_n_W( void )
     return(NhlFATAL);
   }
 
-  tmp_iperm = (ng_size_t*)calloc(ndim,sizeof(ng_size_t));
   if(type_iperm == NCL_int) {
+    tmp_iperm = (void*)calloc(ndim,sizeof(int));
     iperm     = (void*)calloc(ndim*total_elements,sizeof(int));
   } else {
+    tmp_iperm = (void*)calloc(ndim,sizeof(ng_size_t));
     iperm     = (void*)calloc(ndim*total_elements,sizeof(ng_size_t));
   }
 
@@ -302,7 +314,11 @@ NhlErrorTypes dim_pqsort_n_W( void )
       index_x = inr + j;
       coerce_subset_input_double_step(x,tmp_x,index_x,total_nr,type_x,ndim,
                                       0,NULL,NULL);
-      NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&ndim,tmp_iperm,kflag,&ier);
+      if(type_iperm == NCL_int) {
+        NGCALLF(dpsortdriver,DPSORTDRIVER)(tmp_x,&indim,(int*)tmp_iperm,kflag,&ier);
+      } else {
+        NGCALLF(dpsortlargedriver,DPSORTLARGEDRIVER)(tmp_x,&ndim,(ng_size_t*)tmp_iperm,kflag,&ier);
+      }
 
       for(k = 0; k < ndim; k++) {
         index_x = inr + j + (k*total_nr);
@@ -310,9 +326,9 @@ NhlErrorTypes dim_pqsort_n_W( void )
  * Coerce output permutation vector
  */
         if(type_iperm == NCL_int) {
-            ((int*)iperm)[index_x] = (int)(tmp_iperm[k]);
+            ((int*)iperm)[index_x] = ((int*)tmp_iperm)[k];
         } else {
-            ((ng_size_t*)iperm)[index_x] = tmp_iperm[k];
+            ((ng_size_t*)iperm)[index_x] = ((ng_size_t*)tmp_iperm)[k];
         }
 
         if(*kflag ==2 || *kflag == -2) {
