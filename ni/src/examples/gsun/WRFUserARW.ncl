@@ -174,14 +174,15 @@ begin
   dx = x1 - x0
   dy = y1 - y0
   distance = (dx*dx + dy*dy)^0.5
-  npts = tointeger(distance)
+  npts = tointeger(distance) + 1
   dxy = new(1,typeof(distance))
   dxy = distance/npts
 
-  xy = new((/ npts, 2 /),typeof(x1))
+  xy = new((/ npts, 2 /),float)
 
-  dx = dx/npts
-  dy = dy/npts
+  ; Make this float so that integer start/end points work
+  dx := tofloat(dx)/(npts-1)
+  dy := tofloat(dy)/(npts-1)
 
   do i=0,npts-1
     xy(i,0) = x0 + i*dx
@@ -354,11 +355,11 @@ begin
        
 ; set vertical cross section
      if (opts) then
-       xy = wrf_user_set_xy( z, loc_param(0)-1, loc_param(1)-1, \    ; the -1 is for NCL dimensions
-                                loc_param(2)-1, loc_param(3)-1, \
+       xy = wrf_user_set_xy( z, loc_param(0), loc_param(1), \    ; assumes 0-based indexing in v6.5.0
+                                loc_param(2), loc_param(3), \
                                 angle, opts )
      else
-       xy = wrf_user_set_xy( z, loc_param(0), loc_param(1), \
+       xy = wrf_user_set_xy( z, loc_param(0), loc_param(1), \ ; 
                                 0.0, 0.0, angle, opts )
      end if
      xp = dimsizes(xy)
@@ -414,10 +415,10 @@ begin
 
 
 
-     st_x = tointeger(xy(0,0)) + 1
-     st_y = tointeger(xy(0,1)) + 1
-     ed_x = tointeger(xy(xp(0)-1,0)) + 1
-     ed_y = tointeger(xy(xp(0)-1,1)) + 1
+     st_x = tointeger(xy(0,0)) ; + 1 (removed 1-based indexing in 6.5.0) 
+     st_y = tointeger(xy(0,1)) ; + 1
+     ed_x = tointeger(xy(xp(0)-1,0)) ; + 1
+     ed_y = tointeger(xy(xp(0)-1,1)) ; + 1
      if (opts) then
        var2d@Orientation = "Cross-Section: (" + \
                             st_x + "," + st_y + ") to (" + \
@@ -615,19 +616,26 @@ begin
   if(typeof(file_id).eq."file") then
     ISFILE  = True
     nc_file = file_id
-  else if(typeof(file_id).eq."list") then
+  elseif(typeof(file_id).eq."list") then
     ISFILE  = False
     nc_file = file_id[0]
   else
-    print("_get_wrf_var: Invalid file id. Cannot extract requested variable.")
+    print("_get_wrf_var: Error: Invalid file id. Cannot extract requested variable.")
     exit
   end if
-  end if
 
+  if(.not.isfilevar(nc_file,vname)) then
+    print("_get_wrf_var: Error: Variable '" + vname + \
+          "' does not exist on the requested file(s).")
+    print("   Make sure you have a proper WRF output file that contains the")
+    print("   required variables for the diagnostic you want, or the")
+    print("   variable you want. Use 'ncl_filedump' to look at the file.")
+    exit
+  end if
   dims = getfilevardimsizes(nc_file,vname)
   rank = dimsizes(dims)
   if(rank.gt.6) then
-    print("_get_wrf_var: Cannot extract requested variable " + vname + " with rank="+rank)
+    print("_get_wrf_var: Error: Cannot extract requested variable " + vname + " with rank="+rank)
     exit
   end if
 
@@ -641,40 +649,30 @@ begin
     if(ISFILE) then                   ; Case 1
       if(rank.eq.1) then
         var = nc_file->$vname$(nt)
-      else if(rank.eq.2) then
+      elseif(rank.eq.2) then
         var = nc_file->$vname$(nt,:)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = nc_file->$vname$(nt,:,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = nc_file->$vname$(nt,:,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = nc_file->$vname$(nt,:,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = nc_file->$vname$(nt,:,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
-      end if
       end if
     else                              ; Case 3
       if(rank.eq.1) then
         var = file_id[:]->$vname$(nt)
-      else if(rank.eq.2) then
+      elseif(rank.eq.2) then
         var = file_id[:]->$vname$(nt,:)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = file_id[:]->$vname$(nt,:,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = file_id[:]->$vname$(nt,:,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = file_id[:]->$vname$(nt,:,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = file_id[:]->$vname$(nt,:,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
-      end if
       end if
     end if
   end if
@@ -707,19 +705,19 @@ begin
   if(typeof(file_id).eq."file") then
     ISFILE  = True
     nc_file = file_id
-  else if(typeof(file_id).eq."list") then
+  elseif(typeof(file_id).eq."list") then
     ISFILE  = False
     nc_file = file_id[0]
   else
-    print("_get_wrf_var_level: Invalid file id. Cannot extract requested variable.")
+    print("_get_wrf_var_level: Error: Invalid file id. Cannot extract requested")
+    print(    " variable ("+vname+")")
     exit
-  end if
   end if
 
   dims = getfilevardimsizes(nc_file,vname)
   rank = dimsizes(dims)
   if(rank.lt.2.or.rank.gt.6) then
-    print("_get_wrf_var_level: Cannot extract requested variable " + vname + " with rank="+rank)
+    print("_get_wrf_var_level: Error: Cannot extract requested variable " + vname + " with rank="+rank)
     exit
   end if
 
@@ -727,68 +725,52 @@ begin
     if(ISFILE) then                        ; Case 2 
       if(rank.eq.2) then
         var = nc_file->$vname$(:,nl)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = nc_file->$vname$(:,nl,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = nc_file->$vname$(:,nl,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = nc_file->$vname$(:,nl,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = nc_file->$vname$(:,nl,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
       end if
     else                                   ; Case 4 
       if(rank.eq.2) then
         var = file_id[:]->$vname$(:,nl)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = file_id[:]->$vname$(:,nl,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = file_id[:]->$vname$(:,nl,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = file_id[:]->$vname$(:,nl,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = file_id[:]->$vname$(:,nl,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
       end if
     end if
   else
     if(ISFILE) then                       ; Case 1 
       if(rank.eq.2) then
         var = nc_file->$vname$(nt,nl)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = nc_file->$vname$(nt,nl,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = nc_file->$vname$(nt,nl,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = nc_file->$vname$(nt,nl,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = nc_file->$vname$(nt,nl,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
       end if
     else                                  ; Case 3
       if(rank.eq.2) then
         var = file_id[:]->$vname$(nt,nl)
-      else if(rank.eq.3) then
+      elseif(rank.eq.3) then
         var = file_id[:]->$vname$(nt,nl,:)
-      else if(rank.eq.4) then
+      elseif(rank.eq.4) then
         var = file_id[:]->$vname$(nt,nl,:,:)
-      else if(rank.eq.5) then
+      elseif(rank.eq.5) then
         var = file_id[:]->$vname$(nt,nl,:,:,:)
-      else if(rank.eq.6) then
+      elseif(rank.eq.6) then
         var = file_id[:]->$vname$(nt,nl,:,:,:,:)
-      end if
-      end if
-      end if
-      end if
       end if
     end if
   end if
@@ -813,13 +795,12 @@ begin
   if(typeof(file_handle).eq."file") then
     ISFILE = True
     nc_file = file_handle
-  else if(typeof(file_handle).eq."list") then
+  elseif(typeof(file_handle).eq."list") then
     ISFILE = False
     nc_file = file_handle[0]
   else
-    print("wrf_user_getvar: error: the first argument must be a file or a list of files opened with addfile or addfiles")
+    print("wrf_user_getvar: Error: the first argument must be a file or a list of files opened with addfile or addfiles")
     return
-  end if
   end if
 
   variable = varin(0)
@@ -863,7 +844,7 @@ begin
          end if  
        end if  
        if(.not.all(isvar((/"u","v","u_in","v_in"/)))) then
-         print("wrf_user_getvar: error: couldn't find variables needed to calculate 'uvmet'")
+         print("wrf_user_getvar: Error: couldn't find variables needed to calculate 'uvmet'")
          return
        end if
 
@@ -963,12 +944,11 @@ begin
        ;  U interpolated to mass points
        if(isfilevar(nc_file,"U")) then
          getTHIS = "U"
-       else if(isfilevar(nc_file,"UU")) then
+       elseif(isfilevar(nc_file,"UU")) then
          getTHIS = "UU"
        else
-         print("wrf_user_getvar: error: cannot find 'U' or 'UU' on the file")
+         print("wrf_user_getvar: Error: cannot find 'U' or 'UU' on the file")
          return
-       end if
        end if
        var = _get_wrf_var(file_handle,getTHIS,time)
        ua  = wrf_user_unstagger(var,var@stagger)
@@ -981,12 +961,11 @@ begin
   if( variable .eq. "va" ) then
        if(isfilevar(nc_file,"V")) then
          getTHIS = "V" 
-       else if(isfilevar(nc_file,"VV")) then
+       elseif(isfilevar(nc_file,"VV")) then
          getTHIS = "VV"
        else
-         print("wrf_user_getvar: error: cannot find 'V' or 'VV' on the file")
+         print("wrf_user_getvar: Error: cannot find 'V' or 'VV' on the file")
          return
-       end if
        end if
        var = _get_wrf_var(file_handle,getTHIS,time)
        va  = wrf_user_unstagger(var,var@stagger)
@@ -1012,13 +991,12 @@ begin
          var = _get_wrf_var(file_handle,"P",time)
          PB  = _get_wrf_var(file_handle,"PB",time)
          var = var + PB
-       else if(isfilevar(nc_file,"PRES")) then
+       elseif(isfilevar(nc_file,"PRES")) then
          ;; may be a met_em file - see if we can get PRES
          var = _get_wrf_var(file_handle,"PRES",time)
        else
-         print("wrf_user_getvar: error: cannot find 'P' or 'PRES' on the file")
+         print("wrf_user_getvar: Error: cannot find 'P' or 'PRES' on the file")
          return
-       end if
        end if
        var@description = "Pressure"
        if( variable .eq. "pressure" ) then
@@ -1038,16 +1016,15 @@ begin
          var = var + PHB
          z = wrf_user_unstagger(var,var@stagger)
          z@description = "Geopotential"
-       else if(isfilevar(nc_file,"GHT")) then
+       elseif(isfilevar(nc_file,"GHT")) then
          ;; may be a met_em file - see if we can get GHT - data in met_em file is Height in M
          z = _get_wrf_var(file_handle,"GHT",time)
          z = z * 9.81
          z@description = "Geopotential"
          z@units       = "m2 s-2"
        else
-         print("wrf_user_getvar: error: cannot find 'PH' or 'GHT' on the file")
+         print("wrf_user_getvar: Error: cannot find 'PH' or 'GHT' on the file")
          return
-       end if
        end if
 
        if( any( variable .eq. (/"z","height"/) ) ) then
@@ -1081,12 +1058,11 @@ begin
          t = wrf_tk( P , T )
          copy_VarAtts_except(T,t,"description")
          ;; may be a met_em file - see if we can get TT
-       else if(isfilevar(nc_file,"TT")) then
+       elseif(isfilevar(nc_file,"TT")) then
          t = _get_wrf_var(file_handle,"TT",time)
        else
-         print("wrf_user_getvar: error: cannot find 'T' or 'TT' on the file")
+         print("wrf_user_getvar: Error: cannot find 'T' or 'TT' on the file")
          return
-       end if  
        end if  
        if( variable .eq. "tc" ) then
          t = t - 273.16
@@ -1162,13 +1138,12 @@ begin
          tk     = wrf_tk( P , T )    ; calculate TK
          slp    = wrf_slp( z, tk, P, QVAPOR )  ; calculate slp
          copy_VarAtts_except(T,slp,(/"description","units"/))
-       else if(isfilevar(nc_file,"PMSL")) then
+       elseif(isfilevar(nc_file,"PMSL")) then
          ;; may be a met_em file - see if we can get PMSL
          slp = _get_wrf_var(file_handle,"PMSL",time)
        else
-         print("wrf_user_getvar: error: cannot find 'PMSL' or 'T' on the file")
+         print("wrf_user_getvar: Error: cannot find 'PMSL' or 'T' on the file")
          return
-       end if  
        end if  
 
        return(slp)
@@ -1190,13 +1165,12 @@ begin
          tk     = wrf_tk( P , T )
          rh     = wrf_rh( QVAPOR, P, tk )
          copy_VarAtts_except(T,rh,(/"description","units"/))
-       else if(isfilevar(nc_file,"RH")) then
+       elseif(isfilevar(nc_file,"RH")) then
          ;; may be a met_em file - see if we can get RH
          rh = _get_wrf_var(file_handle,"RH",time)
        else
-         print("wrf_user_getvar: error: cannot find 'T' or 'RH' on the file")
+         print("wrf_user_getvar: Error: cannot find 'T' or 'RH' on the file")
          return
-       end if  
        end if  
        return(rh)
   end if
@@ -1213,14 +1187,13 @@ begin
          rh2  = wrf_rh( Q2, PSFC, T2 )
          copy_VarAtts_except(T2,rh2,(/"description","units"/))
          rh2@description = "2m Relative Humidity"           
-       else if(isfilevar(nc_file,"RH")) then
+       elseif(isfilevar(nc_file,"RH")) then
          ;; may be a met_em file - see if we can get RH
          print("Probably a met_em file - get lowest level from RH field")
          rh2 = _get_wrf_var_level(file_handle,"RH",time,0)
        else
-         print("wrf_user_getvar: error: cannot find 'T2' or 'RH' on the file")
+         print("wrf_user_getvar: Error: cannot find 'T2' or 'RH' on the file")
          return
-       end if
        end if  
        return(rh2)
   end if
@@ -1442,11 +1415,10 @@ begin
          if(rank_ph.eq.3) then
            pw_sfc_ptop!0 = PH!1
            pw_sfc_ptop!1 = PH!2
-         else if(rank_ph.eq.4) then
+         elseif(rank_ph.eq.4) then
            pw_sfc_ptop!0 = PH!0
            pw_sfc_ptop!1 = PH!2
            pw_sfc_ptop!2 = PH!3
-         end if
          end if
        end if
        pw_sfc_ptop@description = "Precipitable Water"
@@ -1459,13 +1431,12 @@ begin
        if(isfilevar(nc_file,"U")) then
          getU = "U" 
          getV = "V" 
-        else if(isfilevar(nc_file,"UU")) then
+        elseif(isfilevar(nc_file,"UU")) then
          getU = "UU"
          getV = "VV"
        else
-         print("wrf_user_getvar: error: cannot find 'U' or 'UU' on the file")
+         print("wrf_user_getvar: Error: cannot find 'U' or 'UU' on the file")
          return
-       end if
        end if
        u_in   = _get_wrf_var(file_handle,getU,time)
        v_in   = _get_wrf_var(file_handle,getV,time)
@@ -1521,13 +1492,12 @@ begin
        if(isfilevar(nc_file,"U")) then
          getU = "U" 
          getV = "V" 
-        else if(isfilevar(nc_file,"UU")) then
+        elseif(isfilevar(nc_file,"UU")) then
          getU = "UU"
          getV = "VV"
        else
-         print("wrf_user_getvar: error: cannot find 'U' or 'UU' on the file")
+         print("wrf_user_getvar: Error: cannot find 'U' or 'UU' on the file")
          return
-       end if
        end if
        u_in   = _get_wrf_var(file_handle,getU,time)
        v_in   = _get_wrf_var(file_handle,getV,time)
@@ -1895,7 +1865,7 @@ begin
 
 ;---As of NCL V6.0.0, wrf_user_getvar can now handle a file or a list of files.
   if(all(typeof(nc_file).ne.(/"file","list"/))) then
-    print("wrf_user_list_times: error: the input argument must be a file or a list of files opened with addfile or addfiles")
+    print("wrf_user_list_times: Error: the input argument must be a file or a list of files opened with addfile or addfiles")
     return
   end if
 
@@ -1952,13 +1922,12 @@ begin
   if(typeof(file_handle).eq."file") then
     ISFILE = True
     nc_file = file_handle
-  else if(typeof(file_handle).eq."list") then
+  elseif(typeof(file_handle).eq."list") then
     ISFILE = False
     nc_file = file_handle[0]
   else
-    print("wrf_user_ll_to_ij: error: the first argument must be a file or a list of files opened with addfile or addfiles")
+    print("wrf_user_ll_to_ij: Error: the first argument must be a file or a list of files opened with addfile or addfiles")
     return
-  end if
   end if
 
   opts = opts_args
@@ -2045,13 +2014,12 @@ begin
   if(typeof(file_handle).eq."file") then
     ISFILE = True
     nc_file = file_handle
-  else if(typeof(file_handle).eq."list") then
+  elseif(typeof(file_handle).eq."list") then
     ISFILE = False
     nc_file = file_handle[0]
   else
-    print("wrf_user_ij_to_ll: error: the first argument must be a file or a list of files opened with addfile or addfiles")
+    print("wrf_user_ij_to_ll: Error: the first argument must be a file or a list of files opened with addfile or addfiles")
     return
-  end if
   end if
 
   opts = opts_args
@@ -2138,13 +2106,12 @@ begin
   if(typeof(file_handle).eq."file") then
     ISFILE = True
     nc_file = file_handle
-  else if(typeof(file_handle).eq."list") then
+  elseif(typeof(file_handle).eq."list") then
     ISFILE = False
     nc_file = file_handle[0]
   else
-    print("wrf_user_vert_interp: error: the first argument must be a file or a list of files opened with addfile or addfiles")
+    print("wrf_user_vert_interp: Error: the first argument must be a file or a list of files opened with addfile or addfiles")
     return
-  end if
   end if
 
   rgas    = 287.04     ;J/K/kg
@@ -2399,7 +2366,7 @@ begin
   if(first_time) then
     if(fileexists(cdf_debug_file).or.fileexists(ncl_debug_file).or.\
        fileexists(res_debug_file)) then
-      print("write_wrf_debug_info: error: debug files '" + cdf_debug_file + "',")
+      print("write_wrf_debug_info: Error: debug files '" + cdf_debug_file + "',")
       print("'" + ncl_debug_file + "' and/or " + res_debug_file + " exist.")
       print("Please remove file(s) and start script again.")
       exit
@@ -2608,11 +2575,11 @@ begin
   opts@cnHighLabelBackgroundColor = get_res_value_keep(opts,"cnHighLabelBackgroundColor", -1)
   opts@cnLowLabelBackgroundColor  = get_res_value_keep(opts,"cnLowLabelBackgroundColor", -1)
   opts@cnLineColor                = get_res_value_keep(opts,"cnLineColor", "Black")
-  opts@cnLineLabelFontColor       = opts@cnLineColor
-  opts@cnLineLabelPerimColor      = opts@cnLineColor
-  opts@cnInfoLabelFontColor       = opts@cnLineColor
-  opts@cnHighLabelFontColor       = opts@cnLineColor
-  opts@cnLowLabelFontColor        = opts@cnLineColor
+  opts@cnLineLabelFontColor       = get_res_value_keep(opts,"cnLineLabelFontColor",opts@cnLineColor)
+  opts@cnLineLabelPerimColor      = get_res_value_keep(opts,"cnLineLabelPerimColor",opts@cnLineColor)
+  opts@cnInfoLabelFontColor       = get_res_value_keep(opts,"cnInfoLabelFontColor",opts@cnLineColor)
+  opts@cnHighLabelFontColor       = get_res_value_keep(opts,"cnHighLabelFontColor",opts@cnLineColor)
+  opts@cnLowLabelFontColor        = get_res_value_keep(opts,"cnLowLabelFontColor",opts@cnLineColor)
 
 
 ; Set field Title and levels if available
@@ -2620,11 +2587,10 @@ begin
     info_string = " Contours: $CMN$ to $CMX$ by $CIU$"
     if(isatt(opts,"FieldTitle")) then
         opts@cnInfoLabelString = opts@FieldTitle + info_string
-    else if(isatt(data,"description")) then
+    elseif(isatt(data,"description")) then
         opts@cnInfoLabelString = data@description + info_string
     else
         opts@cnInfoLabelString = info_string
-    end if
     end if
   end if
 
@@ -3087,7 +3053,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("set_mp_wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -3104,7 +3070,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             opts@mpLambertMeridianF  = get_res_value_keep(opts, "mpLambertMeridianF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("set_mp_wrf_map_resources: error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -3120,7 +3086,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("set_mp_wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -3136,7 +3102,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("set_mp_wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -3161,11 +3127,10 @@ begin
             southern = False ; default to northern hemisphere
             if (in_file@POLE_LON .eq. 0.0) then
               southern = True
-            else if (in_file@POLE_LON .ne. 180) then
+            elseif (in_file@POLE_LON .ne. 180) then
               if (isatt(in_file,"CEN_LAT") .and. in_file@CEN_LAT .lt. 0.0) then
                 southern = True  ; probably but not necessarily true -- no way to tell for sure
               end if
-            end if
             end if
 
             if (.not. southern) then
@@ -3178,12 +3143,12 @@ begin
 
           end if
 
-        else if (isatt(in_file,"ref_lon") .and. isatt(in_file,"ref_lat")) then
+        elseif (isatt(in_file,"ref_lon") .and. isatt(in_file,"ref_lat")) then
           ;; this is definitely true for NMM grids but unlikely for ARW grids especially if ref_x and ref_y are set
           opts@mpCenterLatF = get_res_value_keep(opts, "mpCenterLatF", in_file@REF_LAT) 
           opts@mpCenterLonF = get_res_value_keep(opts, "mpCenterLonF", in_file@REF_LON) 
 
-        else if (isatt(in_file,"cen_lat") .and. isatt(in_file,"cen_lon")) then
+        elseif (isatt(in_file,"cen_lat") .and. isatt(in_file,"cen_lon")) then
           ;; these usually specifiy the center of the coarse domain --- not necessarily the center of the projection
           opts@mpCenterLatF  = get_res_value_keep(opts, "mpCenterLatF",in_file@CEN_LAT)
           opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF",in_file@CEN_LON)
@@ -3193,8 +3158,6 @@ begin
           opts@mpCenterLatF  = get_res_value_keep(opts, "mpCenterLatF", 0.0)
           opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF", 180.0)
 
-        end if
-        end if
         end if
       end if
   
@@ -3620,11 +3583,10 @@ begin
             southern = False ; default to northern hemisphere
             if (opts@pole_lon .eq. 0.0) then
               southern = True
-            else if (opts@pole_lon .ne. 180) then
+            elseif (opts@pole_lon .ne. 180) then
               if (isatt(opts,"cen_lat") .and. opts@cen_lat .lt. 0.0) then
                 southern = True  ; probably but not necessarily true -- no way to tell for sure
               end if
-            end if
             end if
 
             if (.not. southern) then
@@ -3637,12 +3599,12 @@ begin
 
           end if
 
-        else if (isatt(opts,"ref_lon") .and. isatt(opts,"ref_lat")) then
+        elseif (isatt(opts,"ref_lon") .and. isatt(opts,"ref_lat")) then
           ;; this is definitely true for NMM grids but unlikely for ARW grids especially if ref_x and ref_y are set
           opts@mpCenterLatF = get_res_value_keep(opts, "mpCenterLatF", opts@ref_lat) 
           opts@mpCenterLonF = get_res_value_keep(opts, "mpCenterLonF", opts@ref_lon) 
 
-        else if (isatt(opts,"cen_lat") .and. isatt(opts,"cen_lon")) then
+        elseif (isatt(opts,"cen_lat") .and. isatt(opts,"cen_lon")) then
           ;; these usually specifiy the center of the coarse domain --- not necessarily the center of the projection
           opts@mpCenterLatF  = get_res_value_keep(opts, "mpCenterLatF",opts@cen_lat)
           opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF",opts@cen_lon)
@@ -3651,9 +3613,6 @@ begin
           ;; default values for global grid
           opts@mpCenterLatF  = get_res_value_keep(opts, "mpCenterLatF", 0.0)
           opts@mpCenterLonF  = get_res_value_keep(opts, "mpCenterLonF", 180.0)
-
-        end if
-        end if
         end if
       end if
 
@@ -3689,11 +3648,10 @@ begin
   ;grid_to_plot = mpres@grid_to_plot
   if(grid_to_plot.eq.0) then
   ; print("Plotting using corner mass grid points")
-  else if(grid_to_plot.eq.1) then
+  elseif(grid_to_plot.eq.1) then
   ; print("Plotting using edges of the corner grid cells")
   else
-   print("ERROR: Invalid value for grid_to_plot = "+grid_to_plot)
-  end if
+   print("wrf_wps_dom: Error: Invalid value for grid_to_plot = "+grid_to_plot)
   end if
   ;BPR END
 
@@ -3752,12 +3710,11 @@ begin
   ;Determine adjustment needed to convert from mass grid to chosen grid
   if(grid_to_plot.eq.0) then
    adjust_grid = 0.0 
-  else if(grid_to_plot.eq.1) then
+  elseif(grid_to_plot.eq.1) then
    adjust_grid = 0.5 
   else 
-   print("ERROR: Invalid value for grid_to_plot = "+grid_to_plot)
+   print("wrf_wps_dom: Error: Invalid value for grid_to_plot = "+grid_to_plot)
    adjust_grid = 0.0 
-  end if
   end if
 
   xx = 1.0 - adjust_grid
@@ -3831,13 +3788,12 @@ begin
         j_end = (mpres@e_sn(idom)-2)/(1.0*mpres@parent_grid_ratio(idom)) + j_start
         
         if(grid_to_plot.eq.0) then
-         adjust_grid = 0.0 
-        else if(grid_to_plot.eq.1) then
-         adjust_grid = 0.5/(1.0*mpres@parent_grid_ratio(idom))
+          adjust_grid = 0.0 
+        elseif(grid_to_plot.eq.1) then
+          adjust_grid = 0.5/(1.0*mpres@parent_grid_ratio(idom))
         else 
-         print("ERROR: Invalid value for grid_to_plot = "+grid_to_plot)
-         adjust_grid = 0.0 
-        end if
+          print("wrf_wps_dom : Error: Invalid value for grid_to_plot = "+grid_to_plot)
+          adjust_grid = 0.0 
         end if
         
         ;BPR END
@@ -3857,13 +3813,12 @@ begin
         ;aj_start = mpres@j_parent_start(idom)*1.0
 
         if(grid_to_plot.eq.0) then
-         adjust_grid = 0.0 
-        else if(grid_to_plot.eq.1) then
-         adjust_grid = 0.5/(1.0*mpres@parent_grid_ratio(idom)) 
+          adjust_grid = 0.0 
+        elseif(grid_to_plot.eq.1) then
+          adjust_grid = 0.5/(1.0*mpres@parent_grid_ratio(idom)) 
         else 
-         print("ERROR: Invalid value for grid_to_plot = "+grid_to_plot)
-         adjust_grid = 0.0 
-        end if
+          print("wrf_wps_dom: Error: Invalid value for grid_to_plot = "+grid_to_plot)
+          adjust_grid = 0.0 
         end if
 
         do while ( nd .gt. 1)
@@ -3879,13 +3834,12 @@ begin
           i_points = (i_points/(1.0*mpres@parent_grid_ratio(nd-1)))
           j_points = (j_points/(1.0*mpres@parent_grid_ratio(nd-1)))
           if(grid_to_plot.eq.0) then
-           adjust_grid = 0.0 
-          else if(grid_to_plot.eq.1) then
-           adjust_grid = adjust_grid/(1.0*mpres@parent_grid_ratio(nd-1))
+            adjust_grid = 0.0 
+          elseif(grid_to_plot.eq.1) then
+            adjust_grid = adjust_grid/(1.0*mpres@parent_grid_ratio(nd-1))
           else 
-           print("ERROR: Invalid value for grid_to_plot = "+grid_to_plot)
-           adjust_grid = 0.0 
-          end if
+            print("wrf_wps_dom: Error: Invalid value for grid_to_plot = "+grid_to_plot)
+            adjust_grid = 0.0 
           end if
 
           ;nd = nd - 1
@@ -3994,7 +3948,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             map_args@mpCenterLonF  = get_res_value_keep(map_args, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -4010,7 +3964,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             map_args@mpLambertMeridianF  = get_res_value_keep(map_args, "mpLambertMeridianF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -4025,7 +3979,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             map_args@mpCenterLonF  = get_res_value_keep(map_args, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -4040,7 +3994,7 @@ begin
           if(isatt(in_file,"CEN_LON"))
             map_args@mpCenterLonF  = get_res_value_keep(map_args, "mpCenterLonF",in_file@CEN_LON)
           else
-           print("ERROR: Found neither STAND_LON or CEN_LON in file")
+           print("wrf_map_resources: Error: Found neither STAND_LON or CEN_LON in file")
           end if
         end if
       end if
@@ -4072,11 +4026,10 @@ begin
             southern = False ; default to northern hemisphere
             if (in_file@POLE_LON .eq. 0.0) then
               southern = True
-            else if (in_file@POLE_LON .ne. 180) then
+            elseif (in_file@POLE_LON .ne. 180) then
               if (isatt(in_file,"CEN_LAT") .and. in_file@CEN_LAT .lt. 0.0) then
                 southern = True  ; probably but not necessarily true -- no way to tell for sure
               end if
-            end if
             end if
 
             if (.not. southern) then
@@ -4089,12 +4042,12 @@ begin
 
           end if
 
-        else if (isatt(in_file,"ref_lon") .and. isatt(in_file,"ref_lat")) then
+        elseif (isatt(in_file,"ref_lon") .and. isatt(in_file,"ref_lat")) then
           ;; this is definitely true for NMM grids but unlikely for ARW grids especially if ref_x and ref_y are set
           map_args@mpCenterLatF = get_res_value_keep(map_args, "mpCenterLatF", in_file@REF_LAT) 
           map_args@mpCenterLonF = get_res_value_keep(map_args, "mpCenterLonF", in_file@REF_LON) 
 
-        else if (isatt(in_file,"cen_lat") .and. isatt(in_file,"cen_lon")) then
+        elseif (isatt(in_file,"cen_lat") .and. isatt(in_file,"cen_lon")) then
           ;; these usually specifiy the center of the coarse domain --- not necessarily the center of the projection
           map_args@mpCenterLatF  = get_res_value_keep(map_args, "mpCenterLatF",in_file@CEN_LAT)
           map_args@mpCenterLonF  = get_res_value_keep(map_args, "mpCenterLonF",in_file@CEN_LON)
@@ -4104,8 +4057,6 @@ begin
           map_args@mpCenterLatF  = get_res_value_keep(map_args, "mpCenterLatF", 0.0)
           map_args@mpCenterLonF  = get_res_value_keep(map_args, "mpCenterLonF", 180.0)
 
-        end if
-        end if
         end if
 
       end if
@@ -4289,7 +4240,7 @@ function wrf_map_overlays(in_file[1]:file, \
 ;
 ; If LatLonOverlay is set to True, then this means the user is
 ; using the 2D lat/lon coordinates to do the overlay, and hence
-; tfDoNDCOverlay should not be set to True. (The default is False.)
+; tfDoNDCOverlay should not be set to NDCViewport (True) (default is False).
 ;
 begin
 
@@ -4352,7 +4303,7 @@ begin
       end if
       if(.not.latlon_overlay) then
         setvalues plots(i)
-          "tfDoNDCOverlay" : True
+          "tfDoNDCOverlay" : "NDCViewport"
           "tiMainOn"       : False
         end setvalues
       else
@@ -4461,7 +4412,7 @@ function wrf_overlays(in_file[1]:file, \
 ;
 ; If LatLonOverlay is set to True, then this means the user is
 ; using the 2D lat/lon coordinates to do the overlay, and hence
-; tfDoNDCOverlay should not be set to True. (The default is False.)
+; tfDoNDCOverlay should not be set to NDCViewport (True) (default is False).
 ;
 begin
   opts = opt_arg      ; Make a copy of the resource list.
@@ -4489,7 +4440,7 @@ begin
     SubTitles = SubTitle
     if(.not.latlon_overlay) then
       setvalues plots(0)
-        "tfDoNDCOverlay" : True
+        "tfDoNDCOverlay" : "NDCViewport"
         "tiMainOn"       : False
       end setvalues
     else
@@ -4500,7 +4451,7 @@ begin
   else
     if(.not.latlon_overlay) then
       setvalues plots(0)
-        "tfDoNDCOverlay" : True
+        "tfDoNDCOverlay" : "NDCViewport"
       end setvalues
     end if
   end if
@@ -4532,7 +4483,7 @@ begin
       end if
       if(.not.latlon_overlay) then
         setvalues plots(i)
-          "tfDoNDCOverlay" : True
+          "tfDoNDCOverlay" : "NDCViewport"
           "tiMainOn"       : False
         end setvalues
       else
@@ -4709,7 +4660,7 @@ begin
         end if
         if(.not.latlon_overlay) then
     	  setvalues plots(i)
-            "tfDoNDCOverlay" : True
+            "tfDoNDCOverlay" : "NDCViewport"
             "tiMainOn"       : False
           end setvalues
         else
@@ -4720,7 +4671,7 @@ begin
       else
         if(.not.latlon_overlay) then
   	  setvalues plots(i)
-            "tfDoNDCOverlay" : True
+            "tfDoNDCOverlay" : "NDCViewport"
           end setvalues
         end if
       end if
@@ -4821,7 +4772,7 @@ procedure wrf_overlay(wks:graphic, plots[*]:graphic, \
 ;
 ; If LatLonOverlay is set to True, then this means the user is
 ; using the 2D lat/lon coordinates to do the overlay, and hence
-; tfDoNDCOverlay should not be set to True. (The default is False.)
+; tfDoNDCOverlay should not be set to NDCViewport/True (default is False).
 ;
 begin
   print("wrf_overlay: Warning: This procedure is obsolete. Consider using")
@@ -4849,7 +4800,7 @@ begin
     SubTitles = SubTitle
     if(.not.latlon_overlay) then
       setvalues plots(0)
-        "tfDoNDCOverlay" : True
+        "tfDoNDCOverlay" : "NDCViewport"
         "tiMainOn"       : False
       end setvalues
     else
@@ -4859,7 +4810,7 @@ begin
     end if
   else
     setvalues plots(0)
-      "tfDoNDCOverlay" : True
+      "tfDoNDCOverlay" : "NDCViewport"
     end setvalues
   end if
 
@@ -4879,7 +4830,7 @@ begin
         SubTitles = SubTitles + "~C~" + SubTitle
         if(.not.latlon_overlay) then
           setvalues plots(i)
-            "tfDoNDCOverlay" : True
+            "tfDoNDCOverlay" : "NDCViewport"
             "tiMainOn"       : False
           end setvalues
         else
@@ -4890,7 +4841,7 @@ begin
       else
         if(.not.latlon_overlay) then
           setvalues plots(i)
-            "tfDoNDCOverlay" : True
+            "tfDoNDCOverlay" : "NDCViewport"
           end setvalues
         end if
       end if
@@ -5029,11 +4980,10 @@ begin
           tmp_str = tmp_str + "/)"
         end if
       end do
-    else      if(typeof(x).eq."string") then
-        tmp_str = tmp_str + "'" + x + "'"
-      else
-        tmp_str = tmp_str + x
-      end if
+    elseif(typeof(x).eq."string") then
+      tmp_str = tmp_str + "'" + x + "'"
+    else
+      tmp_str = tmp_str + x
     end if
     print("" + tmp_str)
     delete(x)

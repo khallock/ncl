@@ -4688,6 +4688,7 @@ static NhlIsoLine *CnTriMeshGetIsoLines
  * problems otherwise. (Not sure yet whether it is needed in some cases
  * though, and perhaps not needed in certain Ezmap cases.
  */
+	cnp->out_of_range_val = 1e30;
 	if (cnp->trans_obj->base.layer_class->base_class.class_name ==
 	    NhlmapTransObjClass->base_class.class_name) {
 		NhlVAGetValues(cnp->trans_obj->base.id, 
@@ -6425,7 +6426,7 @@ void   (_NHLCALLF(hluctchhl,HLUCTCHHL))
 		c_pcseti("FN",Cnp->high_lbls.font);
 		c_pcseti("QU",Cnp->high_lbls.quality);
 		c_pcsetc("FC",Cnp->high_lbls.fcode);
-		gset_linewidth(Cnp->high_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->high_lbls.thickness);
 
 		strcpy(buf,(char *)Cnp->high_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
@@ -6476,7 +6477,7 @@ void   (_NHLCALLF(hluctchhl,HLUCTCHHL))
 		c_pcseti("FN",Cnp->high_lbls.font);
 		c_pcseti("QU",Cnp->high_lbls.quality);
 		c_pcsetc("FC",Cnp->high_lbls.fcode);
-		gset_linewidth((float)Cnp->high_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->high_lbls.thickness);
 
 		strcpy(buf,(char *)Cnp->high_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
@@ -6524,7 +6525,7 @@ void   (_NHLCALLF(hluctchhl,HLUCTCHHL))
 		c_pcseti("FN",Cnp->low_lbls.font);
 		c_pcseti("QU",Cnp->low_lbls.quality);
 		c_pcsetc("FC",Cnp->low_lbls.fcode);
-		gset_linewidth((float)Cnp->low_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->low_lbls.thickness);
 		strcpy(buf,(char *)Cnp->low_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
 			return;
@@ -6574,7 +6575,7 @@ void   (_NHLCALLF(hluctchhl,HLUCTCHHL))
 		c_pcseti("FN",Cnp->low_lbls.font);
 		c_pcseti("QU",Cnp->low_lbls.quality);
 		c_pcsetc("FC",Cnp->low_lbls.fcode);
-		gset_linewidth((float)Cnp->low_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->low_lbls.thickness);
 		strcpy(buf,(char *)Cnp->low_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
 			return;
@@ -6656,7 +6657,7 @@ void   (_NHLCALLF(hluctchll,HLUCTCHLL))
 		c_pcseti("FN",Cnp->line_lbls.font);
 		c_pcseti("QU",Cnp->line_lbls.quality);
 		c_pcsetc("FC",Cnp->line_lbls.fcode);
-		gset_linewidth((float)Cnp->line_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->line_lbls.thickness);
 	}
 	else if (*iflg == 2) {
 		if (Cnp->line_lbls.gks_bcolor > NhlTRANSPARENT)
@@ -6684,7 +6685,7 @@ void   (_NHLCALLF(hluctchll,HLUCTCHLL))
 			c_pcseti("FN",Cnp->line_lbls.font);
 			c_pcseti("QU",Cnp->line_lbls.quality);
 			c_pcsetc("FC",Cnp->line_lbls.fcode);
-			gset_linewidth((float)Cnp->line_lbls.thickness);
+                        c_pcsetr("CL",(float)Cnp->line_lbls.thickness);
 		}
 		Cnp->line_lbls.count++;
 	}

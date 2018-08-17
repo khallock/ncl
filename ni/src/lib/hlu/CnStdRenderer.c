@@ -2161,6 +2161,7 @@ static NhlIsoLine *CnStdGetIsoLines
  * problems otherwise. (Not sure yet whether it is needed in some cases
  * though, and perhaps not needed in certain Ezmap cases.
  */
+	cnp->out_of_range_val = 1e30;
 	if (cnp->trans_obj->base.layer_class->base_class.class_name ==
 	    NhlmapTransObjClass->base_class.class_name) {
 		NhlVAGetValues(cnp->trans_obj->base.id, 
@@ -2272,7 +2273,7 @@ static NhlIsoLine *CnStdGetIsoLines
 		ilp->x = ilp->y = NULL;
 		ilp->start_point = ilp->n_points = NULL;
 		while (! done) {
-			float out_of_range = 1e30;
+			float out_of_range = cnp->out_of_range_val;
 			int mystatus;
 			subret = _NhlCpcltr(cnp->data,cnp->fws,cnp->iws,clvp[i],
 					    &flag,&xloc,&yloc,&npoints,entry_name);
@@ -2306,65 +2307,39 @@ static NhlIsoLine *CnStdGetIsoLines
 				save_yloc = yloc[npoints-1];
 			}
 			
-			if ( tfp->overlay_trans_obj && tfp->overlay_trans_obj != tfp->trans_obj && ! ezmap) {
-				if (tfp->overlay_trans_obj->base.layer_class->base_class.class_name ==
-				    NhlirregularTransObjClass->base_class.class_name) {
-					subret = _NhlCompcToData(tfp->overlay_trans_obj,xloc,yloc,npoints,xloc,yloc,
-								 &mystatus,&out_of_range,&out_of_range);
-				}
-				else {
-					subret = _NhlWinToData(tfp->overlay_trans_obj,xloc,yloc,npoints,xloc,yloc,
-							       &mystatus,&out_of_range,&out_of_range);
-				}
-			}
-			else {
+			if ((! tfp->overlay_trans_obj) || (tfp->overlay_trans_obj == tfp->trans_obj) ||
+			    (tfp->do_ndc_overlay == NhlNDCVIEWPORT)) {
 				subret = _NhlWinToData(tfp->trans_obj,xloc,yloc,npoints,xloc,yloc,
 						       &mystatus,&out_of_range,&out_of_range);
 			}
-			memcpy((char*)(ilp->x + current_point_count),xloc, npoints * sizeof(float)); 
-			memcpy((char*)(ilp->y + current_point_count),yloc, npoints * sizeof(float)); 
-
-			if (ezmap) { /* points need to be transformed back into map coordinates */
-				double xlon, ylat,last_xlon;
-				int mod_360 = 0;
-				int j, k = current_point_count;
-				int first = 1;
-				for (j = current_point_count; j < current_point_count + npoints; j++) {
-					c_mdptri((double)ilp->x[j],(double)ilp->y[j],&ylat,&xlon);
-					if (xlon > 1e10) 
-						continue;
-					if (first) {
-						last_xlon = xlon;
-						first = 0;
-					}
-					switch (mod_360) {
-					case 0:
-					default:
-						if (last_xlon - xlon < -180) {
-							mod_360 = -1;
-						}
-						else if (last_xlon - xlon > 180) {
-							mod_360 = 1;
-						}
-						break;
-					case 1:
-						if (xlon - last_xlon > 180) {
-							mod_360 = 0;
-						}
-						break;
-					case -1:
-						if (xlon - last_xlon < -180) {
-							mod_360 = 0;
-						}
-						break;
-					}
-					ilp->x[k] = (float)xlon + mod_360 * 360;
-					ilp->y[k] = (float)ylat;
-					last_xlon = xlon;
-					k++;
-				}
-				npoints = k - current_point_count;
+			else if (tfp->overlay_trans_obj->base.layer_class->base_class.class_name ==
+				    NhlirregularTransObjClass->base_class.class_name) {
+				subret = _NhlCompcToData(tfp->overlay_trans_obj,xloc,yloc,npoints,xloc,yloc,
+							 &mystatus,&out_of_range,&out_of_range);
 			}
+			else {
+				subret = _NhlWinToData(tfp->overlay_trans_obj,xloc,yloc,npoints,xloc,yloc,
+						       &mystatus,&out_of_range,&out_of_range);
+			}
+
+			if (mystatus) {
+				/* some points have mapped to out of range */
+				int tix = 0;
+				for (int j = 0; j < npoints; j++) {
+					if (xloc[j] == out_of_range) {
+						continue;
+					}
+					*(ilp->x + current_point_count + tix) = xloc[j];
+					*(ilp->y + current_point_count + tix) = yloc[j];
+					tix++;
+				}
+				npoints = tix;
+			}
+			else {
+				memcpy((char*)(ilp->x + current_point_count),xloc, npoints * sizeof(float)); 
+				memcpy((char*)(ilp->y + current_point_count),yloc, npoints * sizeof(float)); 
+			}
+
 			if (npoints == 0) 
 				continue;
 			if (same_segment) {
@@ -2883,6 +2858,14 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 	NhlFormatRec *frec;
 	int *fwidth, *sig_digits, *left_sig_digit, *point_pos, *exp_switch_len, *exp_field_width;
 
+/*
+ * For documentation on how this function is used see the LLU documentation for the Conpack routine CPCHHL.
+ * Note for bux fix NCL-2577: it appears that setting the line width for text drawing using Plotchar routines must
+ * use the PLCHHQ parameter 'CL'. Linewidth set using gset_linewidth is over-ridden inside PLCHHQ. On the other hand,
+ * the border linewidth can only be set using gset_linewidth. The parameters that are documented ('BL' and/or 'OL') 
+ * seem to have no effect. 
+ */
+
 	if (Cnp == NULL) {
 		_NHLCALLF(cpchhl,CPCHHL)(iflg);
 		return;
@@ -2929,7 +2912,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 		c_pcseti("FN",Cnp->high_lbls.font);
 		c_pcseti("QU",Cnp->high_lbls.quality);
 		c_pcsetc("FC",Cnp->high_lbls.fcode);
-		gset_linewidth(Cnp->high_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->high_lbls.thickness);
 
 		strcpy(buf,(char *)Cnp->high_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
@@ -2957,6 +2940,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 		break;
 	case -2:
 		if (! Cnp->high_lbls.on) return;
+		c_pcsetr("BL",(float)Cnp->high_lbls.perim_lthick);
 		if (Cnp->hlb_val > 1 && Cnp->high_lbls.gks_bcolor == NhlTRANSPARENT)
 			_NhlSetFillOpacity(Cnl, 1.0); 
 		break;
@@ -2980,7 +2964,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 		c_pcseti("FN",Cnp->high_lbls.font);
 		c_pcseti("QU",Cnp->high_lbls.quality);
 		c_pcsetc("FC",Cnp->high_lbls.fcode);
-		gset_linewidth((float)Cnp->high_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->high_lbls.thickness);
 
 		Cnp->high_lbls.count++;
 		strcpy(buf,(char *)Cnp->high_lbls.text);
@@ -3004,7 +2988,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 			_NhlSetLineOpacity(Cnl, 0.0); 
 		else {
 			gset_line_colr_ind(Cnp->high_lbls.gks_plcolor);
-			gset_linewidth(Cnp->high_lbls.perim_lthick);
+			gset_linewidth((float)Cnp->high_lbls.perim_lthick);
 		}
 		break;
 	case -4:
@@ -3028,7 +3012,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 		c_pcseti("FN",Cnp->low_lbls.font);
 		c_pcseti("QU",Cnp->low_lbls.quality);
 		c_pcsetc("FC",Cnp->low_lbls.fcode);
-		gset_linewidth((float)Cnp->low_lbls.thickness);
+		c_pcsetr("CL",(float)Cnp->low_lbls.thickness);
 		strcpy(buf,(char *)Cnp->low_lbls.text);
 		if ((sub = strstr(buf,"$ZDV$")) == NULL) {
 			return;
@@ -3078,7 +3062,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 		c_pcseti("FN",Cnp->low_lbls.font);
 		c_pcseti("QU",Cnp->low_lbls.quality);
 		c_pcsetc("FC",Cnp->low_lbls.fcode);
-		gset_linewidth((float)Cnp->low_lbls.thickness);
+		c_pcsetr("CL",(float)Cnp->low_lbls.thickness);
 
 		Cnp->low_lbls.count++;
 		strcpy(buf,(char *)Cnp->low_lbls.text);
@@ -3102,7 +3086,7 @@ void   (_NHLCALLF(hlucpchhl,HLUCPCHHL))
 			_NhlSetLineOpacity(Cnl, 0.0); 
 		else {
 			gset_line_colr_ind(Cnp->low_lbls.gks_plcolor);
-			gset_linewidth(Cnp->low_lbls.perim_lthick);
+			gset_linewidth((float)Cnp->low_lbls.perim_lthick);
 		}
 		break;
 	case -8:
@@ -3146,7 +3130,13 @@ void   (_NHLCALLF(hlucpchll,HLUCPCHLL))
 
 	int pai;
 	static int llcol;
-
+/*
+ * For documentation on how this function is used see the LLU documentation for the Conpack routine CPCHLL.
+ * Note for bux fix NCL-2577: it appears that setting the line width for text drawing using Plotchar routines must
+ * use the PLCHHQ parameter 'CL'. Linewidth set using gset_linewidth is over-ridden inside PLCHHQ. On the other hand,
+ * the border linewidth can only be set using gset_linewidth. The parameters that are documented ('BL' and/or 'OL') 
+ * seem to have no effect. 
+ */
 	if (Cnp == NULL) {
 		_NHLCALLF(cpchll,CPCHLL)(iflg);
 		return;
@@ -3161,7 +3151,7 @@ void   (_NHLCALLF(hlucpchll,HLUCPCHLL))
 		c_pcseti("FN",Cnp->line_lbls.font);
 		c_pcseti("QU",Cnp->line_lbls.quality);
 		c_pcsetc("FC",Cnp->line_lbls.fcode);
-		gset_linewidth((float)Cnp->line_lbls.thickness);
+                c_pcsetr("CL",(float)Cnp->line_lbls.thickness);
 	}
 	else if (*iflg == 2) {
 		if (Cnp->line_lbls.gks_bcolor > NhlTRANSPARENT)
@@ -3189,13 +3179,13 @@ void   (_NHLCALLF(hlucpchll,HLUCPCHLL))
 			c_pcseti("FN",Cnp->line_lbls.font);
 			c_pcseti("QU",Cnp->line_lbls.quality);
 			c_pcsetc("FC",Cnp->line_lbls.fcode);
-			gset_linewidth((float)Cnp->line_lbls.thickness);
+                        c_pcsetr("CL",(float)Cnp->line_lbls.thickness);
 		}
 		Cnp->line_lbls.count++;
 	}
 	else if (*iflg == 4) {
 		gset_line_colr_ind(Cnp->line_lbls.gks_plcolor);
-		gset_linewidth(Cnp->line_lbls.perim_lthick);
+		gset_linewidth((float)Cnp->line_lbls.perim_lthick);
 	}
 
 	return;

@@ -1,5 +1,5 @@
-NCL - UNIX Version 6.4.0
-Copyright (C) 2017 University Corporation for Atmospheric Research
+NCL - UNIX Version 6.5.0
+Copyright (C) 2018 University Corporation for Atmospheric Research
 The use of this software is governed by a License Agreement.
 See http://www.ncl.ucar.edu/ for more details.
 
@@ -55,7 +55,7 @@ http://www.cisl.ucar.edu/css/software/spherepack/
 UDUNITS-2 
 Copyright 2011
 University Corporation for Atmospheric Research
-http://www.unidata.ucar.edu/software/udunits/udunits-2/udunits2.html
+http://www.unidata.ucar.edu/software/udunits/
 
 Udunits extensions from ncview
 David Pierce, UCSD

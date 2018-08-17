@@ -146,20 +146,18 @@ begin
 ;---Propagate X and Y to 2D if necessary.
   if(rankx.eq.1) then
     x2d = conform_dims((/ncurves,npts/),x,1)
-  else if(rankx.eq.2.and.nlines.ne.ncurvesxy) then    
+  elseif(rankx.eq.2.and.nlines.ne.ncurvesxy) then    
     x2d = reshape(x,(/ncurves,npts/))
   else
     x2d = x
   end if
-  end if
 
   if(ranky.eq.1) then
     y2d = conform_dims((/ncurves,npts/),y,1)
-  else if(ranky.eq.2.and.nlines.ne.ncurvesxy) then    
+  elseif(ranky.eq.2.and.nlines.ne.ncurvesxy) then    
     y2d = reshape(y,(/ncurves,npts/))
   else
     y2d = y
-  end if
   end if
 
 ;---Propagate ref_lines to 1D array if necessary
@@ -192,8 +190,8 @@ begin
   do j=0, ncurves-1
     num_crosses = 0
     do i=1, npts-1
-      xinterp(j,i+num_crosses) = x2d(j,i)
-      yinterp(j,i+num_crosses) = y2d(j,i)
+      xinterp(j,i+num_crosses) = (/x2d(j,i)/)    ; Use (/.../) to make sure coordinate
+      yinterp(j,i+num_crosses) = (/y2d(j,i)/)    ; arrays don't get needlessly copied.
       if(.not.ismissing(y2d(j,i)).and..not.ismissing(x2d(j,i)).and.\
          .not.ismissing(y2d(j,i-1)).and..not.ismissing(x2d(j,i-1)))
         if((reftype.eq."y").and.\
@@ -202,21 +200,20 @@ begin
           xinterp(j,i+num_crosses) = xy_ref_interp(x2d(j,i-1),x2d(j,i),\
                                                    y2d(j,i-1),y2d(j,i),\
                                                    ref1d(j),reftype)
-          xinterp(j,i+num_crosses+1) = x2d(j,i)
-          yinterp(j,i+num_crosses)   = ref1d(j)
-          yinterp(j,i+num_crosses+1) = y2d(j,i)
+          xinterp(j,i+num_crosses+1) = (/x2d(j,i)/)
+          yinterp(j,i+num_crosses)   = (/ref1d(j)/)
+          yinterp(j,i+num_crosses+1) = (/y2d(j,i)/)
           num_crosses = num_crosses + 1
-        else if((reftype.eq."x").and.\
+        elseif((reftype.eq."x").and.\
                 ((x2d(j,i-1).lt.ref1d(j).and.x2d(j,i).gt.ref1d(j)).or.\
                  (x2d(j,i-1).gt.ref1d(j).and.x2d(j,i).lt.ref1d(j)))) then
           yinterp(j,i+num_crosses) = xy_ref_interp(x2d(j,i-1),x2d(j,i),\
                                                    y2d(j,i-1),y2d(j,i),\
                                                    ref1d(j),reftype)
-          yinterp(j,i+num_crosses+1) = y2d(j,i)
-          xinterp(j,i+num_crosses)   = ref1d(j)
-          xinterp(j,i+num_crosses+1) = x2d(j,i)
+          yinterp(j,i+num_crosses+1) = (/y2d(j,i)/)
+          xinterp(j,i+num_crosses)   = (/ref1d(j)/)
+          xinterp(j,i+num_crosses+1) = (/x2d(j,i)/)
           num_crosses = num_crosses + 1
-        end if
         end if
       end if
     end do
@@ -1418,12 +1415,10 @@ begin
 ;       is_valid_latlon2d_attr(data,"lon2d")) then
     if(is_valid_latlon2d_attr(data,"lon2d")) then
       res@$xarray_name$ = data@lon2d
-    else if(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lon1d")) then
+    elseif(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lon1d")) then
       res@$xarray_name$ = data@lon1d
-    else if(is_valid_coord(data,"x")) then
+    elseif(is_valid_coord(data,"x")) then
       res@$xarray_name$ = data&$data!1$
-    end if
-    end if
     end if
   end if
 
@@ -1433,12 +1428,10 @@ begin
 ;       is_valid_latlon2d_attr(data,"lat2d")) then
     if(is_valid_latlon2d_attr(data,"lat2d")) then
       res@$yarray_name$ = data@lat2d
-    else if(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
+    elseif(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
       res@$yarray_name$ = data@lat1d
-    else if(is_valid_coord(data,"y")) then
+    elseif(is_valid_coord(data,"y")) then
       res@$yarray_name$ = data&$data!0$
-    end if
-    end if
     end if
   end if
 
@@ -1584,6 +1577,24 @@ begin
            "deg east"/))
 end
 
+;----------------------------------------------------------------------
+; This function checks if tfDoNDCOverlay is explicitly set to True or 
+; NDCDataExtent / NDCViewport, which means no data transformation is
+; to take place when overlaying data on a plot.
+;
+; If tfDoNDCOverlay is not set or it is set to False or DataTransform,
+; then this function returns False.
+;----------------------------------------------------------------------
+undef("check_for_ndc_overlay")
+function check_for_ndc_overlay(res)
+begin
+  if(check_attr_enum_value(res,"tfDoNDCOverlay","NDCViewport").or.\
+     check_attr_enum_value(res,"tfDoNDCOverlay","NDCDataExtent")) then
+    return(True)
+  end if
+  return(False)
+end
+
 ;***********************************************************************;
 ; Function : is_valid_latlon_coord                                      ;
 ;                                                                       ;
@@ -1604,14 +1615,7 @@ undef("is_valid_latlon_coord")
 function is_valid_latlon_coord(data:numeric,axis:string,latorlon:string,\
                                res:logical)
 begin
-;
-; If tfDoNDCOverlay is set to True, then coordinate arrays shouldn't be
-; used in the first place, and hence the units don't need to be correct.
-; It is up to the user to do the right thing and *not* set coordinate
-; arrays.  Here, we check for the setting of this resource to True,
-; and if so, then the units attribute isn't even checked.
-;
-  if(get_res_value_keep(res,"tfDoNDCOverlay",False)) then
+  if(check_for_ndc_overlay(res)) then
     return(False)
   end if
 
@@ -1796,17 +1800,10 @@ procedure check_for_y_lat_coord(data:numeric,res:logical,type:string)
 local latname, char_latname, array_name, start_name, end_name, \
 valid_2dcoord_types, prefix
 begin 
-;
-;
-; If tfDoNDCOverlay is set to True, then coordinate arrays shouldn't be
-; used in the first place.  It is up to the user to do the right thing
-; and *not* set coordinate arrays.  Here, we check for the setting
-; of this resource to True, and if so, then no warning messages are 
-; printed out if no coordinate arrays are set.
-;
-  if(get_res_value_keep(res,"tfDoNDCOverlay",False)) then
+  if(check_for_ndc_overlay(res)) then
     return(False)
   end if
+
 ;
 ; Determine what kind of plot we need to set the data field resources for.
 ; 
@@ -1836,9 +1833,9 @@ begin
 ;       is_valid_latlon2d_attr(data,"lat2d")) then
     if(is_valid_latlon2d_attr(data,"lat2d")) then
       res@$array_name$ = data@lat2d
-    else if(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
+    elseif(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
       res@$array_name$ = data@lat1d
-    else if(is_valid_latlon_coord(data,"y","lat",res))
+    elseif(is_valid_latlon_coord(data,"y","lat",res))
       res@$array_name$ = data&$data!0$
     else
       print("check_for_y_lat_coord: Warning: Data either does not contain")
@@ -1846,8 +1843,6 @@ begin
       print("A valid latitude coordinate array should have a 'units'")
       print("attribute equal to one of the following values: ")
       print("    " + cat_strings(get_allowed_lat_units))
-    end if
-    end if
     end if
   end if 
 
@@ -1872,14 +1867,7 @@ procedure check_for_x_lat_coord(data:numeric,res:logical,type:string)
 local latname, char_latname, array_name, start_name, end_name, \
 valid_2dcoord_types, prefx
 begin 
-;
-; If tfDoNDCOverlay is set to True, then coordinate arrays shouldn't be
-; used in the first place.  It is up to the user to do the right thing
-; and *not* set coordinate arrays.  Here, we check for the setting
-; of this resource to True, and if so, then no warning messages are 
-; printed out if no coordinate arrays are set.
-;
-  if(get_res_value_keep(res,"tfDoNDCOverlay",False)) then
+  if(check_for_ndc_overlay(res)) then
     return(False)
   end if
 ;
@@ -1912,9 +1900,9 @@ begin
 ;       is_valid_latlon2d_attr(data,"lat2d")) then
     if(is_valid_latlon2d_attr(data,"lat2d")) then
       res@$array_name$ = data@lat2d
-    else if(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
+    elseif(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lat1d")) then
       res@$array_name$ = data@lat1d
-    else if(is_valid_latlon_coord(data,"x","lat",res))
+    elseif(is_valid_latlon_coord(data,"x","lat",res))
       res@$array_name$ = data&$data!1$
     else
       print("check_for_x_lat_coord: Warning: Data either does not contain")
@@ -1922,8 +1910,6 @@ begin
       print("A valid latitude coordinate array should have a 'units'")
       print("attribute equal to one of the following values: ")
       print("    " + cat_strings(get_allowed_lat_units))
-    end if
-    end if
     end if
   end if
 
@@ -1948,17 +1934,9 @@ procedure check_for_lon_coord(data:numeric,res:logical,type:string)
 local lonname, char_lonname, array_name, start_name, end_name, \
 valid_2dcoord_types
 begin 
-;
-; If tfDoNDCOverlay is set to True, then coordinate arrays shouldn't be
-; used in the first place.  It is up to the user to do the right thing
-; and *not* set coordinate arrays.  Here, we check for the setting
-; of this resource to True, and if so, then no warning messages are 
-; printed out if no coordinate arrays are set.
-;
-  if(get_res_value_keep(res,"tfDoNDCOverlay",False)) then
+  if(check_for_ndc_overlay(res)) then
     return(False)
   end if
-
 ;
 ; Determine what kind of plot we need to set the data field resources for.
 ; 
@@ -1989,9 +1967,9 @@ begin
 ;       is_valid_latlon2d_attr(data,"lon2d")) then
     if(is_valid_latlon2d_attr(data,"lon2d")) then
       res@$array_name$ = data@lon2d
-    else if(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lon1d")) then
+    elseif(prefix.eq."sf".and.is_valid_latlon1d_attr(data,"lon1d")) then
       res@$array_name$ = data@lon1d
-    else if(is_valid_latlon_coord(data,"x","lon",res))
+    elseif(is_valid_latlon_coord(data,"x","lon",res))
       res@$array_name$ = data&$data!1$
     else
       print("check_for_lon_coord: Warning: Data either does not contain")
@@ -1999,8 +1977,6 @@ begin
       print("A valid longitude coordinate array should have a 'units'")
       print("attribute equal to one of the following values: ")
       print("    " + cat_strings(get_allowed_lon_units))
-    end if
-    end if
     end if 
   end if
 
@@ -2124,11 +2100,10 @@ begin
     strings(0) = left_string@sub_string
     if(isatt(left_string,"gsnLeftStringFontHeightF")) then
       fhghts(0) = get_res_value_keep(left_string,"gsnLeftStringFontHeightF",0.)
-    else if(isatt(left_string,"gsnStringFontHeightF")) then
+    elseif(isatt(left_string,"gsnStringFontHeightF")) then
       fhghts(0) = get_res_value_keep(left_string,"gsnStringFontHeightF",0.)
     else
       fhghts(0) = get_res_value_keep(txres,"txFontHeightF",0.0)
-    end if
     end if
     if(isatt(left_string,"gsnLeftStringFuncCode")) then
       fcodes(0) = get_res_value_keep(left_string,"gsnLeftStringFuncCode","~")
@@ -2148,11 +2123,10 @@ begin
     strings(1) = center_string@sub_string
     if(isatt(center_string,"gsnCenterStringFontHeightF")) then
       fhghts(1) = get_res_value_keep(center_string,"gsnCenterStringFontHeightF",0.)
-    else if(isatt(center_string,"gsnStringFontHeightF")) then
+    elseif(isatt(center_string,"gsnStringFontHeightF")) then
       fhghts(1) = get_res_value_keep(center_string,"gsnStringFontHeightF",0.)
     else
       fhghts(1) = get_res_value_keep(txres,"txFontHeightF",0.0)
-    end if
     end if
     if(isatt(center_string,"gsnCenterStringFuncCode")) then
       fcodes(1) = get_res_value_keep(center_string,"gsnCenterStringFuncCode","~")
@@ -2172,11 +2146,10 @@ begin
     strings(2) = right_string@sub_string
     if(isatt(right_string,"gsnRightStringFontHeightF")) then
       fhghts(2) = get_res_value_keep(right_string,"gsnRightStringFontHeightF",0.)
-    else if(isatt(right_string,"gsnStringFontHeightF")) then
+    elseif(isatt(right_string,"gsnStringFontHeightF")) then
       fhghts(2) = get_res_value_keep(right_string,"gsnStringFontHeightF",0.)
     else
       fhghts(2) = get_res_value_keep(txres,"txFontHeightF",0.0)
-    end if
     end if
     if(isatt(right_string,"gsnRightStringFuncCode")) then
       fcodes(2) = get_res_value_keep(right_string,"gsnRightStringFuncCode","~")
@@ -2259,12 +2232,11 @@ begin
   end if
   if(type.eq."polar")
     set_attr(r,"pmLabelBarOrthogonalPosF",0.05)
-  else if(type.eq."ce".and..not.\
+  elseif(type.eq."ce".and..not.\
           (check_attr_enum_value(r,"pmTickMarkDisplayMode","Always").or.\
            check_attr_enum_value(r,"pmTickMarkDisplayMode","Conditional").or.\
            check_attr_enum_value(r,"pmTickMarkDisplayMode","ForceAlways"))) then
     set_attr(r,"pmLabelBarOrthogonalPosF",0.08)
-  end if
   end if
 end
 
@@ -2411,6 +2383,7 @@ begin
       "cnMonoFillColor"       : mono_fill_col
       "cnLabelBarEndStyle"    : end_labelbar_style
       "cnLabelBarEndLabelsOn" : end_labels_on
+      "cnLineLabelFormat"     : line_format    ; default is "*+^sg"
       "lbLabelStrings"        : lbstrings
     end getvalues
 ;
@@ -2486,7 +2459,8 @@ begin
       lbres@lbFillScaleF    = fill_scale
     end if
     lbres@lbFillOpacityF = fill_opacity     ; Added in NCL V6.4.0
-  else if(class_name.eq."vectorPlotClass") then
+  elseif(class_name.eq."vectorPlotClass") then
+    line_format = "*+^sg"    ; VectorPlot doesn't have an equivalent "cnLineLabelFormat" resource
     getvalues the_plot
       "vcLevels"              : levels
       "vcLevelColors"         : colors
@@ -2494,6 +2468,7 @@ begin
       "lbLabelStrings"        : lbstrings
     end getvalues
   else
+    line_format = "*+^sg"    ; StreamlinePlot doesn't have an equivalent "cnLineLabelFormat" resource
 ;---Better be a streamline plot!
     getvalues the_plot
       "stLevels"              : levels
@@ -2501,7 +2476,6 @@ begin
       "stLabelBarEndLabelsOn" : end_labels_on
       "lbLabelStrings"        : lbstrings
     end getvalues
-  end if
   end if
 ;
 ; Vector and Streamline don't have the xxLabelBarEndStyle resource
@@ -2536,6 +2510,9 @@ begin
       if(end_labelbar_style.eq.get_enum_value("IncludeMinMaxLabels")) then
         lbres@lbLabelStrings = lbstrings
       end if
+    end if
+    if(line_format.ne."*+^sg") then
+      lbres@lbLabelStrings = lbstrings
     end if
   end if  
   if(end_labels_on) then
@@ -2585,15 +2562,13 @@ begin
   if(class_name.eq."logLinPlotClass".or.class_name.eq."irregularPlotClass") then
     if(isatt(plot,"contour")) then
       the_plot = plot@contour
-    else if(isatt(plot,"vector")) then
+    elseif(isatt(plot,"vector")) then
       the_plot = plot@vector
-    else if(isatt(plot,"streamline")) then
+    elseif(isatt(plot,"streamline")) then
       the_plot = plot@streamline
     else
       print("Warning: fix_labelbar: invalid plot type, won't try to fix the labelbar.")
       exit      
-    end if
-    end if
     end if
   else
     the_plot = plot
@@ -2644,12 +2619,10 @@ begin
   if(res.and.any(isatt(res,(/"lbLabelAlignment","lbLabelStrings"/)))) then
     if(class_name.eq."contourPlotClass") then
       lbres@cnExplicitLabelBarLabelsOn = get_res_value_keep(res,"cnExplicitLabelBarLabelsOn",True)
-    else if(class_name.eq."vectorPlotClass") then
+    elseif(class_name.eq."vectorPlotClass") then
       lbres@vcExplicitLabelBarLabelsOn = get_res_value_keep(res,"vcExplicitLabelBarLabelsOn",True)
-    else if(class_name.eq."streamlinePlotClass") then
+    elseif(class_name.eq."streamlinePlotClass") then
       lbres@stExplicitLabelBarLabelsOn = get_res_value_keep(res,"stExplicitLabelBarLabelsOn",True)
-    end if
-    end if
     end if
   end if
   if(.not.res.or..not.isatt(res,"pmLabelBarHeightF"))
@@ -2908,7 +2881,7 @@ begin
             xgreater_gon(1:igon) = xgreater_line(0:igon-1)
             ygreater_gon(1:igon) = ygreater_line(0:igon-1)
             newgon = igon + 1
-          else if(reftype.eq."x".and.xgreater_line(0).ne.ref) then
+          elseif(reftype.eq."x".and.xgreater_line(0).ne.ref) then
             ygreater_gon(0) = ygreater_line(0)
             xgreater_gon(0) = ref
             ygreater_gon(1:igon) = ygreater_line(0:igon-1)
@@ -2919,16 +2892,14 @@ begin
             ygreater_gon(0:igon-1) = ygreater_line(0:igon-1)
             newgon = igon
           end if
-          end if
           if(reftype.eq."y".and.ygreater_line(igon-1).ne.ref) then
             xgreater_gon(newgon) = xgreater_line(igon-1)
             ygreater_gon(newgon) = ref
             newgon = newgon + 1
-          else if(reftype.eq."x".and.xgreater_line(igon-1).ne.ref) then
+          elseif(reftype.eq."x".and.xgreater_line(igon-1).ne.ref) then
             ygreater_gon(newgon) = ygreater_line(igon-1)
             xgreater_gon(newgon) = ref
             newgon = newgon + 1
-          end if
           end if
 
           polygons(ngons) = gsn_add_polygon(wks,xy,xgreater_gon(0:newgon-1),\
@@ -2982,7 +2953,7 @@ begin
             xless_gon(1:igon) = xless_line(0:igon-1)
             yless_gon(1:igon) = yless_line(0:igon-1)
             newgon = igon + 1
-          else if(reftype.eq."x".and.xless_line(0).ne.ref) then
+          elseif(reftype.eq."x".and.xless_line(0).ne.ref) then
             yless_gon(0) = yless_line(0)
             xless_gon(0) = ref
             yless_gon(1:igon) = yless_line(0:igon-1)
@@ -2993,16 +2964,14 @@ begin
             yless_gon(0:igon-1) = yless_line(0:igon-1)
             newgon = igon
           end if
-          end if
           if(reftype.eq."y".and.yless_line(igon-1).ne.ref) then
             xless_gon(newgon) = xless_line(igon-1)
             yless_gon(newgon) = ref
             newgon = newgon + 1
-          else if(reftype.eq."x".and.xless_line(igon-1).ne.ref) then
+          elseif(reftype.eq."x".and.xless_line(igon-1).ne.ref) then
             yless_gon(newgon) = yless_line(igon-1)
             xless_gon(newgon) = ref
             newgon = newgon + 1
-          end if
           end if
 
           polygons(ngons) = gsn_add_polygon(wks,xy,xless_gon(0:newgon-1), \
@@ -3193,11 +3162,27 @@ local lon_index
 begin
   lon_labels  = new(dimsizes(lon_values),string)
 
+; -540 to -360 (west)
+
+  lon_index = ind(-540.lt.lon_values.and.lon_values.lt.-360)
+  if(.not.all(ismissing(lon_index)))
+    lon_labels(lon_index) = fabs((360+lon_values(lon_index)))  +"W"
+  end if
+  delete(lon_index)
+
+; -360 < lon < -180 (east)
+
+  lon_index = ind(-360.lt.lon_values.and.lon_values.lt.-180)
+  if(.not.all(ismissing(lon_index)))
+    lon_labels(lon_index) = lon_values(lon_index) + 360 + "E"
+  end if
+  delete(lon_index)
+
 ; -180 < lon < 0 (west)
 
-  lon_index = ind((lon_values).lt.0)
+  lon_index = ind(-180.lt.lon_values.and.lon_values.lt.0)
   if(.not.all(ismissing(lon_index)))
-    lon_labels(lon_index) = fabs(lon_values(lon_index)) + "W"  ; west
+    lon_labels(lon_index) = fabs(lon_values(lon_index)) + "W"
   end if
   delete(lon_index)
 
@@ -3205,7 +3190,7 @@ begin
 
   lon_index = ind(lon_values.gt.0.and.lon_values.lt.180)
   if(.not.all(ismissing(lon_index)))
-    lon_labels(lon_index) = lon_values(lon_index) + "E"  ; east
+    lon_labels(lon_index) = lon_values(lon_index) + "E"
   end if
   delete(lon_index)
 
@@ -3213,7 +3198,7 @@ begin
 
   lon_index = ind(lon_values.gt.180.and.lon_values.lt.360)
   if(.not.all(ismissing(lon_index)))
-    lon_labels(lon_index) = (360-lon_values(lon_index)) + "W"  ; west
+    lon_labels(lon_index) = (360-lon_values(lon_index)) + "W"
   end if
   delete(lon_index)
 
@@ -3221,7 +3206,7 @@ begin
 
   lon_index = ind(lon_values.gt.360.and.lon_values.lt.540)
   if(.not.all(ismissing(lon_index)))
-    lon_labels(lon_index) = (lon_values(lon_index)-360)+ "E" ; east
+    lon_labels(lon_index) = (lon_values(lon_index)-360)+ "E"
   end if
   delete(lon_index)
 
@@ -3229,13 +3214,13 @@ begin
 
   lon_index = ind(lon_values.gt.540.and.lon_values.lt.720)
   if(.not.all(ismissing(lon_index)))
-    lon_labels(lon_index) = (540-lon_values(lon_index)) + "W"  ; west
+    lon_labels(lon_index) = (720-lon_values(lon_index)) + "W"
   end if
   delete(lon_index)
 
 ; lon = +/-180 or lon=540 (180)
 
-  lon_index = ind(fabs(lon_values).eq.180.or.lon_values.eq.540)
+  lon_index = ind(fabs(lon_values).eq.180.or.fabs(lon_values).eq.540)
   if(.not.all(ismissing(lon_index)))
     lon_labels(lon_index) = "180"
   end if
@@ -3243,7 +3228,7 @@ begin
 
 ; lon=0, lon=360, or lon=720 (0)
 
-  lon_index = ind(lon_values.eq.0.or.lon_values.eq.360.or.lon_values.eq.720)
+  lon_index = ind(lon_values.eq.0.or.fabs(lon_values).eq.360.or.fabs(lon_values).eq.720)
   if(.not.all(ismissing(lon_index)))
       lon_labels(lon_index) = "0"
   end if
@@ -3613,9 +3598,10 @@ end
 ; This function determines an appropriate default value for the special ;
 ; gsnAddCyclic resource, based on the data input and options.           ;
 ;                                                                       ;
-; If res@gsnAddCyclic=True, then True is returned regardless of anything;
-; else. If tfDoNDCOverlay is set to True, or if the calling function is ;
-; not one of the gsn_csm_xxx_map functions, then False is returned.     ;
+; If res@gsnAddCyclic=True, then True is returned regardless of         ;
+; anything else. If tfDoNDCOverlay is set to an NDC overlay, or if the  ;
+; calling function is not one of the gsn_csm_xxx_map functions, then    ;
+;  False is returned.                                                   ;
 ;                                                                       ;
 ; Otherwise, this function checks the given list of data variables to   ;
 ; see if they all have the *potential* for having a longitude cyclic    ;
@@ -3638,8 +3624,8 @@ begin
     end if
   end if
 
-;---If tfDoNDCOverlay is set to True, then gsnAddCyclic shouldn't be True.
-  if(get_res_value_keep(res,"tfDoNDCOverlay",False).or.ftype.ne."map") then
+;---If tfDoNDCOverlay is set to an NDC overlay, then gsnAddCyclic shouldn't be True.
+  if(check_for_ndc_overlay(res).or.ftype.ne."map") then
     return(False)
   end if
   
@@ -4366,21 +4352,19 @@ begin
   if(reftype.eq."y") then
     color_res1 = "gsnYRefLineColor"
     color_res2 = "gsnYRefLineColors"
-  else if(reftype.eq."x") then
+  elseif(reftype.eq."x") then
     color_res1 = "gsnXRefLineColor"
     color_res2 = "gsnXRefLineColors"
   else
     print("get_ref_line_color: fatal, invalid type for reference line color.")
     return
   end if
-  end if
   if(isatt(rfres,color_res2))
     ref_line_color = convert_color_to_rgba(wks,rfres@$color_res2$)
-  else if(isatt(rfres,color_res1))
+  elseif(isatt(rfres,color_res1))
     ref_line_color = convert_color_to_rgba(wks,rfres@$color_res1$)
   else
     ref_line_color = convert_color_to_rgba(wks,"foreground")
-  end if
   end if
   dims = dimsizes(ref_line_color)
   rank = dimsizes(dims)
@@ -4411,13 +4395,12 @@ begin
   if(reftype.eq."y") then
     pattern_res1 = "gsnYRefLineDashPattern"
     pattern_res2 = "gsnYRefLineDashPatterns"
-  else if(reftype.eq."x") then
+  elseif(reftype.eq."x") then
     pattern_res1 = "gsnXRefLineDashPattern"
     pattern_res2 = "gsnXRefLineDashPatterns"
   else
     print("get_ref_line_pattern: fatal, invalid type for reference line pattern.")
     return
-  end if
   end if
   if(isatt(rfres,pattern_res1)) then
     if(dimsizes(rfres@$pattern_res1$).gt.1) then
@@ -4425,11 +4408,10 @@ begin
       print("                      Use " + pattern_res2 + " if multiple patterns desired.")
     end if
     ref_line_pattern := rfres@$pattern_res1$(0)
-  else if(isatt(rfres,pattern_res2))
+  elseif(isatt(rfres,pattern_res2))
     ref_line_pattern := rfres@$pattern_res2$
   else  
     ref_line_pattern = 0
-  end if
   end if
 
   dims = dimsizes(ref_line_pattern)
@@ -4456,13 +4438,12 @@ begin
   if(reftype.eq."y") then
     thickness_res1 = "gsnYRefLineThicknessF"
     thickness_res2 = "gsnYRefLineThicknesses"
-  else if(reftype.eq."x") then
+  elseif(reftype.eq."x") then
     thickness_res1 = "gsnXRefLineThicknessF"
     thickness_res2 = "gsnXRefLineThicknesses"
   else
     print("get_ref_line_thickness: fatal, invalid type for reference line thickness.")
     return
-  end if
   end if
   if(isatt(rfres,thickness_res1)) then
     if(dimsizes(rfres@$thickness_res1$).gt.1) then
@@ -4470,11 +4451,10 @@ begin
       print("                        Use " + thickness_res2 + " if multiple thicknesses desired.")
     end if
     ref_line_thickness = rfres@$thickness_res1$(0)
-  else if(isatt(rfres,thickness_res2)) then
+  elseif(isatt(rfres,thickness_res2)) then
     ref_line_thickness = rfres@$thickness_res2$
   else
     ref_line_thickness = 1.0
-  end if
   end if
   dims = dimsizes(ref_line_thickness)
   rank = dimsizes(dims)
@@ -4499,18 +4479,15 @@ local tmpdims, color_res, msg_color
 begin
   if(location.eq."above") then
     color_res = "gsnAboveYRefLineColor"
-  else if(location.eq."below") then
+  elseif(location.eq."below") then
     color_res = "gsnBelowYRefLineColor"
-  else if(location.eq."right") then
+  elseif(location.eq."right") then
     color_res = "gsnRightXRefLineColor"
-  else if(location.eq."left") then
+  elseif(location.eq."left") then
     color_res = "gsnLeftXRefLineColor"
   else
     print("get_ref_line_fill_color: fatal, invalid type for reference fill color.")
     return
-  end if
-  end if
-  end if
   end if
 
   msg_color = new((/1,4/),float)
@@ -4572,6 +4549,44 @@ begin
 ;;  end if
 end
 
+
+;**********************************************************************
+; This function returns true if a reference line is set and any
+; of the above/below/left/right fill resources are set.
+; 
+; It also checks if both X/Y ref line fill is set, because this is
+; not allowed currently (maybe never?).
+;**********************************************************************
+undef("is_ref_line_fill_set")
+function is_ref_line_fill_set(reftype,rfres)
+local xref_line_name,xgrt_res_name,xlss_res_name,yref_line_name,ygrt_res_name,ylss_res_name
+begin
+  yref_line_name = "gsnYRefLine"
+  ygrt_res_name  = "gsnAboveYRefLineColor"
+  ylss_res_name  = "gsnBelowYRefLineColor"
+  xref_line_name = "gsnXRefLine"
+  xgrt_res_name  = "gsnRightXRefLineColor"
+  xlss_res_name  = "gsnLeftXRefLineColor"
+
+  if((isatt(rfres,yref_line_name).and.(isatt(rfres,ygrt_res_name).or.\
+                                       isatt(rfres,ylss_res_name))).and.\
+     (isatt(rfres,xref_line_name).and.(isatt(rfres,xgrt_res_name).or.\
+                                       isatt(rfres,xlss_res_name)))) then
+    print("is_ref_line_fill_set: Error: you cannot set color fill around both")
+    print("           gsnXRefLine and gsnYRefLine in the same plot.")
+    exit
+  elseif( (reftype.eq."y".and.isatt(rfres,yref_line_name).and.\
+                             (isatt(rfres,ygrt_res_name).or.\
+                              isatt(rfres,ylss_res_name))).or.\
+          (reftype.eq."x".and.isatt(rfres,xref_line_name).and.\
+                             (isatt(rfres,xgrt_res_name).or.\
+                              isatt(rfres,xlss_res_name)))) then
+    return(True)          ; Only fill for this ref line is set
+  else
+    return(False)         ; Neither X nor Y ref line fill is set
+  end if
+end
+
 ;**********************************************************************
 ; This function sets a bunch of variables for drawing an X or Y 
 ; reference line and/or filling curves above/below or to the right/left
@@ -4594,7 +4609,6 @@ begin
   ref_less_curve_fill_on = False
   ref_fill_color_g       = cmsg   ; greater than
   ref_fill_color_l       = cmsg   ; less than
-
 ;
 ; If neither gsnYRefLine or gsnXRefLine are set, but gsnXYBarChart has 
 ; been set, then assume the user wants a Y reference line, and return 
@@ -4604,7 +4618,7 @@ begin
   bar_outline_only = get_res_value_keep(rfres,"gsnXYBarChartOutlineOnly",False)
   if(.not.isatt(rfres,"gsnYRefLine").and..not.isatt(rfres,"gsnXRefLine")) then
     if(reftype.eq."y".and.bar_chart.and..not.bar_outline_only) then
-      ref_line = get_res_value_keep(rfres,"trYMinF",min(y))
+      ref_line := get_res_value_keep(rfres,"trYMinF",min(y))
 ;      print("get_ref_line_options: warning: you've set gsnXYBarChart=True, but haven't")
 ;      print("    specified an X or Y reference line. Will assume a default Y reference")
 ;      print("    line of " + ref_line)
@@ -4618,8 +4632,12 @@ begin
              ref_line_thickness,ref_grtr_curve_fill_on,\
              ref_less_curve_fill_on,ref_fill_color_g,ref_fill_color_l/])
   end if
-  if(bar_outline_only.or.(reftype.eq."x".and..not.isatt(rfres,"gsnXRefLine").or.\
-                          reftype.eq."y".and..not.isatt(rfres,"gsnYRefLine"))) then
+
+;---Check for the case where we just want a reference line, and no fill.
+  ref_fill_on = is_ref_line_fill_set(reftype,rfres)
+  if(bar_outline_only.or.(.not.bar_chart.and..not.bar_outline_only.and..not.ref_fill_on).or.\
+      (reftype.eq."x".and..not.isatt(rfres,"gsnXRefLine").or.\
+       reftype.eq."y".and..not.isatt(rfres,"gsnYRefLine"))) then
     if( (reftype.eq."y".and.isatt(rfres,"gsnYRefLine")).or.\
         (reftype.eq."x".and.isatt(rfres,"gsnXRefLine"))) then
       ref_line_on        = True
@@ -4634,6 +4652,7 @@ begin
              ref_less_curve_fill_on,ref_fill_color_g,ref_fill_color_l/])
   end if
 
+;---If we've made it to here, then we're looking at either filled curves or a bar chart.
   if(reftype.eq."y") then
     fill_string_g = "above"
     fill_string_l = "below"
@@ -5465,11 +5484,10 @@ begin
   nfopacs = max((/nacol,nbcol/))
   if(isatt(res2,"gsnXYFillOpacityF")) then
     fill_opacs = conform_dims(nfopacs,get_res_value(res2,"gsnXYFillOpacityF",1.0),-1)
-  else if(isatt(res2,"gsnXYFillOpacities")) then
+  elseif(isatt(res2,"gsnXYFillOpacities")) then
     fill_opacs = get_res_value(res2,"gsnXYFillOpacities",1.0)
   else
     fill_opacs = conform_dims(nfopacs,1.0,-1)
-  end if
   end if
 ;
 ; Convert input arrays to double.
@@ -6011,8 +6029,8 @@ begin
 ;----------------------------------------------------------------------
     if(.not.bar_chart.and.xref_fill_on) then
       interp_list = ref_line_interp(x,y,xref_line,"x")
-      xinterp  = interp_list[0]
-      yinterp  = interp_list[1]
+      xinterp  := interp_list[0]
+      yinterp  := interp_list[1]
       new_xref_line = interp_list[2]
       new_npts = interp_list[3]
       delete(interp_list)
@@ -6611,7 +6629,7 @@ begin
         "pmTitleDisplayMode" : "Always"
         "pmTitleZone"        : main_zone    ; Zone for main title
       end create
-    else if(limit_mode.eq."corners") then
+    elseif(limit_mode.eq."corners") then
       map_object = create "map" mapPlotClass wks
         "vpXF"                : res2@vpXF
         "vpYF"                : res2@vpYF
@@ -6637,7 +6655,6 @@ begin
         "pmTitleZone"           : main_zone    ; Zone for main title
         "mpLimitMode"           : limit_mode
       end create
-    end if
     end if
 ; This section tests for regular resources.
 
@@ -6746,7 +6763,7 @@ calldraw, callframe, left_string, center_string, right_string, yoffset, \
 min_lat, max_lat, center_lat, main_offset, \
 side, just, orth, para, quad1, quad2, quad3, quad4, topbot, xcen, ycen, \
 vpxf, vpyf, vphf, vpwf, plon, plat, xndc, yndc, polar_type, center_lon, \
-center_lat, rel_c_lon, rel_c_lat, set_text_font
+center_lat, rel_c_lon, rel_c_lat, set_text_font, names
 begin
 
 ; Initialize.
@@ -7010,12 +7027,11 @@ begin
       if(isatt(res2,"gsnPolarLabelFont")) then
         set_text_font = True
         text_font     = get_res_value(res2,"gsnPolarLabelFont",1)
-      else if(isatt(res2,"txFont")) then
+      elseif(isatt(res2,"txFont")) then
         set_text_font = True
         text_font     = get_res_value_keep(res2,"txFont",1)
       else
         set_text_font = False
-      end if
       end if
 
 ; Create an array of TextItem objects that we'll use to label the
@@ -12110,7 +12126,7 @@ begin
 
 ; Create a labelbar.
 
-    if(lbar_on.and.use_old_lbar)
+    if(use_old_lbar)
       if(.not.infolabel_on)
         lbar_zone = 2
       else

@@ -155,6 +155,9 @@ begin
              (/"TriangleLowEnd","1"/),\
              (/"TriangleHighEnd","2"/),\
              (/"TriangleBothEnds","3"/),\
+             (/"DataTransform","0"/),\
+             (/"NDCViewport","1"/),\
+             (/"NDCDataExtent","2"/),\
              (/"Automatic","0"/),\
              (/"Manual","1"/),\
              (/"Explicit","2"/),\
@@ -301,18 +304,25 @@ end
 ; if a resource is set, and if so, it can check both its predefined     ;
 ; string value and its enumerated value. For example, "lbOrientation"   ;
 ; can be set to "horizontal" or "vertical", or the equivalent integer   ;
-; values, 0 or 1.                                                       ;
+; values, 0 or 1, or the equivalent logical values, False / True.       ;
+;                                                                       ;
+; The True/False check was added in NCL V6.5.0.                         ;
 ;***********************************************************************;
 undef("check_attr_enum_value")
 function check_attr_enum_value(res:logical,att_name[1]:string,att_str_value:string)
 local att_num_value
 begin
-  if(.not.isatt(res,att_name).or.typeof(res@$att_name$).ne."string".and.\
-                                 typeof(res@$att_name$).ne."integer") then
+  if(.not.isatt(res,att_name).or.(typeof(res@$att_name$).ne."string".and.\
+                                  typeof(res@$att_name$).ne."integer".and.\
+                                  typeof(res@$att_name$).ne."logical")) then
     return(False)
   end if
   if(typeof(res@$att_name$).eq."string") then
     return(check_attr(res,att_name,att_str_value,True))
+  elseif(typeof(res@$att_name$).eq."logical") then
+    att_num_value = get_enum_value(att_str_value)
+    return((     res@$att_name$.and.att_num_value.eq.1).or.\
+           (.not.res@$att_name$.and.att_num_value.eq.0))
   else
     att_num_value = get_enum_value(att_str_value)
     if(any(ismissing(att_num_value))) then
@@ -510,13 +520,12 @@ local vals1d, i, ii, vals_nomsg, nvals, nuniq_vals, count_only
 begin
   if(opt.eq.0) then
     count_only = False
-  else if(opt.eq.1) then
+  elseif(opt.eq.1) then
     count_only = True
   else
     print("unique_values_opt: Error: Don't recognize opt=" + opt)
     print("This is an internal function and may change")
     exit
-  end if
   end if
 
   if(isatt(vals,"_FillValue")) then
@@ -654,7 +663,7 @@ begin
       end do
     end do
 ;---Check if "n" is the leftmost dimension
-  else if(n.eq.0) then
+  elseif(n.eq.0) then
     do irgt=0,size_rgt_dims-1
       istrt = irgt
       iend  = istrt + size_rgt_n_m1_dims
@@ -672,7 +681,6 @@ begin
       return_count_1d(icount) = count_unique_values(vals_subset)
       icount = icount + 1
     end do
-  end if
   end if
   return(reshape(return_count_1d,return_dims))
 end
@@ -855,25 +863,21 @@ begin
   ; this logical taken directly from HLU code in "Palette.c"
   if (maxValue.le.1) then
       cmap(:,3) = where(cmap(:,3).lt.0, 1., cmap(:,3))
-  else if (maxValue.lt.256) then
+  elseif (maxValue.lt.256) then
       cmap(:,3) = where(cmap(:,3).lt.0, 255., cmap(:,3))
       cmap = cmap / 255.
-  else if (maxValue.eq.256) then
+  elseif (maxValue.eq.256) then
       cmap(:,3) = where(cmap(:,3).lt.0, 256., cmap(:,3))
       cmap = cmap / 256.
-  else if (maxValue.eq.65536) then
+  elseif (maxValue.eq.65536) then
       cmap(:,3) = where(cmap(:,3).lt.0, 65535., cmap(:,3))
       cmap = cmap / 65535. 
-  else if (maxValue.eq.65536) then
+  elseif (maxValue.eq.65536) then
       cmap(:,3) = where(cmap(:,3).lt.0, 65536., cmap(:,3))
       cmap = cmap / 65536.
   else
       cmap(:,3) = where(cmap(:,3).lt.0, maxValue, cmap(:,3))
       cmap = cmap / maxValue
-  end if
-  end if 
-  end if
-  end if
   end if
         
   return cmap
@@ -995,7 +999,7 @@ local ncols, fmin, fmax, fcols, icols, cmap
 begin
   if(isstring(cmapt)) then
      cmap = read_colormap_file(cmapt)
-  else if(isnumeric(cmapt)) then
+  elseif(isnumeric(cmapt)) then
     dims = dimsizes(cmapt)
    if(dimsizes(dims).ne.2.or.dims(0).lt.3.or.dims(0).gt.256.or.\
        .not.any(dims(1).ne.(/3,4/))) then
@@ -1005,7 +1009,6 @@ begin
     cmap = cmapt
   else
     print ("Error: span_color_indexes: cmap must be an n x 3 or n x 4 array of RGB or RGBA values, or a valid color map name")
-  end if
   end if
 
   ncols  = dimsizes(cmap(:,0))
@@ -1053,15 +1056,15 @@ begin
     return(fmsg)
   end if
 
- if(isstring(cmapt)) then
-   cmap = read_colormap_file(cmapt)
-   icols = icols - 2                 ; read_colormap_file returns array 
+  if(isstring(cmapt)) then
+    cmap = read_colormap_file(cmapt)
+    icols = icols - 2                 ; read_colormap_file returns array 
                                      ; with indexes 0 and 1 dropped off
- else 
-   cmap = cmapt
- end if
+  else 
+    cmap = cmapt
+  end if
 
- return(cmap(icols,:))
+  return(cmap(icols,:))
 end
 
 ;***********************************************************************
@@ -1069,7 +1072,7 @@ end
 ; value, this function returns an index value into the colormap
 ; to use for representing the single value
 ;
-; This function is very similar to the get_color_rgb function,
+; This function is very similar to the get_color_rgba function,
 ; except it returns the index value into the color map, rather
 ; than an RGBA value.
 ;
@@ -1077,15 +1080,17 @@ end
 ; of RGB (n,3) or RGBA (n,4).
 ;
 ; This function replaces the deprecated GetFillColor.
+;
+; This function was updated in 6.5.0 to allow values to be an array.
 ;***********************************************************************
 undef("get_color_index")
-function get_color_index(cmapt,cnlvls[*]:numeric,value[1]:numeric)
-local cmap, dims, ncn, nclr, color, n, col_indexes, ncoli
+function get_color_index(cmapt,cnlvls[*]:numeric,values:numeric)
+local cmap, dims, ncn, nclr, color, n, col_indexes, values1d, indexes
 begin
 
  if(isstring(cmapt)) then
     cmap = read_colormap_file(cmapt)
- else if(isnumeric(cmapt)) then
+ elseif(isnumeric(cmapt)) then
    dims = dimsizes(cmapt)
    if(dimsizes(dims).ne.2.or.dims(0).lt.3.or.dims(0).gt.256.or.\
        .not.any(dims(1).ne.(/3,4/))) then
@@ -1096,7 +1101,6 @@ begin
  else
    print ("get_color_index: Error: cmap must be an n x 3 or n x 4 array of RGB or RGBA values, or a valid color map name")
  end if
- end if
 
  ncn  = dimsizes (cnlvls)
  nclr = dimsizes (cmap(:,0))
@@ -1106,29 +1110,51 @@ begin
    print ("get_color_index: Warning: Not enough colors in colormap for number of requested levels")
    print ("         Colors will be repeated")
  end if
- if (ismissing(value)) then
-   print ("get_color_index: Error: Input value is missing")
+ if (any(ismissing(values))) then
+   print ("get_color_index: Error: More or more input values are missing.")
+   print("    Returning missing.")
    return (imsg)
  end if
  if (any(ismissing(cnlvls))) then
-   print ("get_color_index: Error: One or more input contour levels are missing")
+   print ("get_color_index: Error: One or more input contour levels are missing.")
+   print("    Returning missing.")
    return (imsg)
  end if
 
 ;---Get nice span of indexes throughout the color map
- col_indexes = span_color_indexes(cmap,dimsizes(cnlvls)+1)
- ncoli       = dimsizes(col_indexes)    ; should be ncn+1
+ col_indexes = span_color_indexes(cmap,ncn+1)
 
- do n = 0, ncn-1
-   if (value .lt. cnlvls(n)) then
-     break
+;
+; Convert values array to 1D so we can work with it easier. Will 
+; convert back to nD when done.
+;
+ values1d    = ndtooned(values)
+ values_dims = dimsizes(values)
+ nvals       = dimsizes(values1d)
+ indexes     = new(nvals,integer)
+
+;---first level
+ ii = ind(values1d .lt. cnlvls(0))
+ if(.not.ismissing(ii(0))) then
+    indexes(ii) = 0
+ end if
+;---middle levels
+ do n = 1, ncn-1
+   ii := ind(values1d .ge. cnlvls(n-1) .and. values1d .lt. cnlvls(n))
+   if(.not.ismissing(ii(0))) then
+     indexes(ii) = n
    end if
  end do
- if(isstring(cmapt)) then
-   return(col_indexes(n)+2)    ; Account for 0/1 index being dropped
-  else
-   return(col_indexes(n))
+;---last level
+ ii := ind(values1d .ge. cnlvls(ncn-1))
+ if(.not.ismissing(ii(0))) then
+    indexes(ii) = ncn
  end if
+
+ if(isstring(cmapt)) then
+   col_indexes(indexes) = col_indexes(indexes)+2    ; Account for 0/1 index being dropped
+ end if
+ return(reshape(col_indexes(indexes),values_dims))
 end
 
 ;***********************************************************************
@@ -1142,25 +1168,51 @@ end
 ;
 ; The colormap can be a named colormap, like "rainbow", or an array
 ; of RGB (n,3) or RGBA (n,4).
+;
+; This function was updated in 6.5.0 to allow values to be an array.
 ;***********************************************************************
 undef("get_color_rgba")
-function get_color_rgba(cmapt,cnlvls[*]:numeric,value[1]:numeric)
-local fmsg, icol, cmap
+function get_color_rgba(cmapt,cnlvls[*]:numeric,values:numeric)
+local fmsg, icol, cmap, values_dims, values_rank, return_dims, rgb_rank
 begin
  fmsg = new(4,float)          ; missing value
- icol = get_color_index(cmapt,cnlvls,value)
+ icol = get_color_index(cmapt,cnlvls,ndtooned(values))
 
- if (ismissing(icol)) then
+ if (any(ismissing(icol))) then
+   print("get_color_rgba: error: invalid input values. Returning missing.")
    return (fmsg)
+ end if
+
+
+ dims = dimsizes(cmapt)
+ if(isstring(cmapt)) then
+   rgb_rank = 4
+ else
+   if(dimsizes(dims).ne.2.or..not.any(dims(1).eq.(/3,4/))) then
+     print("get_color_rgba: error: input color map must be a predefined color map name")
+     print("     or a 2D array of RGB or RGBA values. Returning missing.")
+     return (fmsg)
+   end if
+   rgb_rank = dims(1)
+ end if
+   
+ if(isscalar(values)) then
+   return_dims = rgb_rank
+ else
+   values_dims = dimsizes(values)
+   values_rank = dimsizes(values_dims)
+   return_dims = new(values_rank+1,typeof(values_dims))
+   return_dims(0:values_rank-1) = values_dims
+   return_dims(values_rank)     = rgb_rank
  end if
 
  if(isstring(cmapt)) then
    cmap = read_colormap_file(cmapt)
-   return(cmap(icol-2,:))    ; Indexes start at 2
+   icol = icol-2    ; Indexes returned by get_color_index start at 2
  else
    cmap = cmapt
-   return(cmap(icol,:))
  end if
+ return(reshape(cmap(icol,:),return_dims))
 end
 
 
@@ -1245,9 +1297,17 @@ begin
   nfiles = 0
   do i=0,ndirs-1
     tmp_files := systemfunc("ls -1 " + cmap_dirs(i))
+;---Skip directory if empty
+    if(ismissing(tmp_files(0))) then
+      continue
+    end if
     nt = dimsizes(tmp_files)
     do j=0,nt-1
+;---Only look for files with xxxx.yyy names. They are not valid color map files otherwise.
       tmp_names     := str_split(tmp_files(j),".")
+      if(dimsizes(tmp_names).lt.2) then
+        continue
+      end if
       cmaps(nfiles) = str_join(tmp_names(0:dimsizes(tmp_names)-2),".")
       nfiles = nfiles + 1
       if(nfiles.ge.max_files) then
@@ -1310,53 +1370,34 @@ begin
   dims_color = dimsizes(colors)
   rank_color = dimsizes(dims_color)
 
-  if(typeof(colors).eq."string".and.\
-     all(is_valid_colormap_names(colors))) then
+  if(typeof(colors).eq."string".and.all(is_valid_colormap_names(colors))) then
     return("colormap")
-  end if
-
-  if(typeof(colors).eq."string".and.\
-     all(is_valid_named_colors(colors))) then
+  elseif(typeof(colors).eq."string".and.all(is_valid_named_colors(colors))) then
     return("named")
-  end if
-
-  if(typeof(colors).eq."string".and.\
-     all(is_valid_special_colors(colors))) then
+  elseif(typeof(colors).eq."string".and.all(is_valid_special_colors(colors))) then
     return("special")
-  end if
-
 ;
 ; This test is different, because we have to make sure all
 ; of the colors are either a named color or a special color.
 ; If you have one bad one in the bunch, then we can't 
 ; claim it is "mixed".
 ;
-  if(typeof(colors).eq."string".and.\
-     (num(is_valid_named_colors(colors))+\
-      num(is_valid_special_colors(colors))).eq.product(dims_color))
+  elseif(typeof(colors).eq."string".and.(num(is_valid_named_colors(colors))+\
+         num(is_valid_special_colors(colors))).eq.product(dims_color))
     return("mixed")
-  end if
-
-  if(dims_color(rank_color-1).eq.3.and.isnumeric(colors).and.\
-     all(colors.ge.0.and.colors.le.1.0)) then
+  elseif(dims_color(rank_color-1).eq.3.and.isnumeric(colors).and.\
+         all(colors.ge.0.and.colors.le.1.0)) then
     return("rgb")
-  end if
-
-  if(dims_color(rank_color-1).eq.4.and.isnumeric(colors).and.\
-     all(colors.ge.0.and.colors.le.1.0)) then
+  elseif(dims_color(rank_color-1).eq.4.and.isnumeric(colors).and.\
+         all(colors.ge.0.and.colors.le.1.0)) then
     return("rgba")
+  elseif(isnumeric(colors).and.all(colors.ge.-1.and.colors.le.255)) then
+    return("index")
+  elseif(isnumeric(colors).and.all(colors.ge.(2^30).and.colors.le.((2^31)-1))) then
+    return("absolute")
+  else
+    return("unknown")
   end if
-
-  if(isnumeric(colors)) then
-    if(all(colors.ge.-1.and.colors.le.255)) then
-      return("index")
-    else if(all(colors.ge.(2^30).and.colors.le.((2^31)-1))) then
-      return("absolute")
-    end if
-    end if
-  end if
-
-  return("unknown")
 end
 
 ;***********************************************************************;
@@ -1384,26 +1425,19 @@ begin
     print("   Will return all missing")
     istrans = new(dims,logical)
     return(istrans)
-  end if
-  if(type.eq."special".or.type.eq."mixed") then
+  elseif(type.eq."special".or.type.eq."mixed") then
     return(str_lower(colors).eq."transparent")
-  end if
-  if(type.eq."index") then
+  elseif(type.eq."index") then
     return(colors.eq.-1)
-  end if
-  if(type.eq."absolute") then
+  elseif(type.eq."absolute") then
     colors_rgba = ndtotwod(color_index_to_rgba(colors))
     return(reshape(colors_rgba(:,3).eq.0.0,dims))
-  end if
-  if(type.eq."rgba") then
-    if(rank.eq.1) then
-      return(colors(3).eq.0.0)
-    else
-      colors2d = ndtotwod(colors)
-      return(reshape(colors2d(:,3).eq.0.0,dims(0:rank-2)))
-    end if
-  end if
-  if(any(type.eq.(/"named","rgb"/))) then
+  elseif(type.eq."rgba".and.rank.eq.1) then
+    return(colors(3).eq.0.0)
+  elseif(type.eq."rgba".and.rank.gt.1) then
+    colors2d = ndtotwod(colors)
+    return(reshape(colors2d(:,3).eq.0.0,dims(0:rank-2)))
+  else    ; better be "named" or "rgb"!
     istrans = new(dims,logical)
     istrans = False
     return(istrans)
@@ -1585,9 +1619,8 @@ begin
     if(.not.ismissing(color_indexes_1d(n))) then
       if(color_indexes_1d(n).ge.0.and.color_indexes_1d(n).lt.ncolors) then
         rgba_2d(n,:) = rgba_cmap(color_indexes_1d(n),:)
-      else if(color_indexes_1d(n).eq.-1) then
+      elseif(color_indexes_1d(n).eq.-1) then
         rgba_2d(n,:) = (/0.,0.,0.,0./)
-      end if
       end if
     end if
   end do
@@ -1719,7 +1752,23 @@ function convert_color_to_rgba(wks,colors)
 local color_type, dims, rank, new_dims
 begin
   color_type = get_color_type(colors)
-  if(color_type.eq."unknown")
+  if(color_type.eq."rgba") then
+    rgba_colors = colors
+  elseif(color_type.eq."index") then
+    rgba_colors = indexcolor2rgba(wks,colors)
+  elseif(color_type.eq."absolute") then
+    rgba_colors = color_index_to_rgba(colors)
+  elseif(color_type.eq."colormap") then
+    rgba_colors = read_colormap_files(colors)
+  elseif(color_type.eq."named") then
+    rgba_colors = namedcolor2rgba(colors)
+  elseif(color_type.eq."special") then
+    rgba_colors = specialcolor2rgba(wks,colors)
+  elseif(color_type.eq."mixed") then
+    rgba_colors = mixedcolor2rgba(wks,colors)
+  elseif(color_type.eq."rgb") then
+    rgba_colors = rgb2rgba(colors)
+  else    ; color_type.eq."unknown"
     dims = dimsizes(colors)
     rank = dimsizes(dims)
     new_dims = new(rank+1,typeof(dims))
@@ -1728,31 +1777,6 @@ begin
     print("convert_color_to_rgba: Error: unknown color type.")
     print("   Returning all missing values.")
     return(new(new_dims,float))
-  end if
-
-  if(color_type.eq."rgba") then
-    rgba_colors = colors
-  else if(color_type.eq."index") then
-    rgba_colors = indexcolor2rgba(wks,colors)
-  else if(color_type.eq."absolute") then
-    rgba_colors = color_index_to_rgba(colors)
-  else if(color_type.eq."colormap") then
-    rgba_colors = read_colormap_files(colors)
-  else if(color_type.eq."named") then
-    rgba_colors = namedcolor2rgba(colors)
-  else if(color_type.eq."special") then
-    rgba_colors = specialcolor2rgba(wks,colors)
-  else if(color_type.eq."mixed") then
-    rgba_colors = mixedcolor2rgba(wks,colors)
-  else if(color_type.eq."rgb") then
-    rgba_colors = rgb2rgba(colors)
-  end if
-  end if
-  end if
-  end if
-  end if
-  end if
-  end if
   end if
 
   rank = dimsizes(dimsizes(rgba_colors))
@@ -2019,29 +2043,21 @@ begin
 
 ;---Check for valid colors
   color_type = get_color_type(colors)
-
-  if(ismissing(color_type).or.color_type.eq."unknown")
-    print("draw_color_palette: Error: invalid color specification.")
-    return
-  end if
-
   if(color_type.eq."rgba") then
     rgba_colors = colors
-  end if
-  if(color_type.eq."index") then
+  elseif(color_type.eq."index") then
     rgba_colors = indexcolor2rgba(wks,colors)
-  end if
-  if(color_type.eq."absolute") then
+  elseif(color_type.eq."absolute") then
     rgba_colors = color_index_to_rgba(colors)
-  end if
-  if(color_type.eq."colormap") then
+  elseif(color_type.eq."colormap") then
     rgba_colors = read_colormap_files(colors)
-  end if
-  if(color_type.eq."named") then
+  elseif(color_type.eq."named") then
     rgba_colors = namedcolor2rgba(colors)
-  end if
-  if(color_type.eq."rgb") then
+  elseif(color_type.eq."rgb") then
     rgba_colors = rgb2rgba(colors)
+  else   ; ismissing(color_type).or.color_type.eq."unknown"
+    print("draw_color_palette: Error: invalid color specification.")
+    return
   end if
 
   ncolors = dimsizes(rgba_colors(:,0))
@@ -2236,4 +2252,257 @@ begin
   return(r_g_b(cmap_len|:,rgb|:))
 end
 
+;***********************************************************************;
+; str_match_bool.ncl                                                    ;
+;                                                                       ;
+; Description:                                                          ;
+; Returns True for all n-dimensional array elements of 'str' that       ;
+; contain 'substr', False otherwise.                                    ;
+;                                                                       ;
+; Prototype:                                                            ;
+;  function str_match_bool ( str : string, substr[1] : string )         ;
+;  return_val [dimsizes(str)] : logical                                 ;
+;                                                                       ;
+; Arguments:                                                            ;
+; 'str'                                                                 ;
+; An n-dimensional array of strings.                                    ;
+; 'substr'                                                              ;
+; A single-value substring to search for in 'str'.                      ;
+;                                                                       ;
+; Return value:                                                         ;
+; An array with elements of the same dimensionality as 'str',           ;
+; with True for all elements that match 'substr', "Missing" for any     ;
+; indices that were missing in the input array, and False otherwise.    ;
+;                                                                       ;
+; Written by: Jared A. Lee                                              ;
+;             jaredlee@ucar.edu                                         ;
+; Written on: 05 Apr 2017                                               ;
+;***********************************************************************;
 
+undef("str_match_bool")
+function str_match_bool(str:string, substr[1]:string)
+local bool, dims, inds
+begin
+    dims = dimsizes(str)
+    bool = new(product(dims), logical)
+    bool = where(.not.ismissing(ndtooned(str)), False, bool)
+
+    inds = str_match_ind(str, substr)   ; this function converts 'str' into a 1-D array
+    if(.not.any(ismissing(inds))) then
+        bool(inds) = True
+    end if
+    return onedtond(bool, dims)
+end
+
+undef("str_match_bool_ic")
+function str_match_bool_ic(str:string, substr[1]:string)
+local bool, dims, inds
+begin
+    dims = dimsizes(str)
+    bool = new(product(dims), logical)
+    bool = where(.not.ismissing(ndtooned(str)), False, bool)
+
+    inds = str_match_ind_ic(str, substr)   ; this function converts 'str' into a 1-D array
+    if(.not.any(ismissing(inds))) then
+        bool(inds) = True
+    end if
+    return onedtond(bool, dims)
+end
+
+undef("isStrSubset")
+function isStrSubset(S[1]:string, s[1]:string)
+; return True or False is "s" is a subset of "S" 
+local SC, sc, nsc, nSC, n, sTF
+begin
+
+   SC  = stringtochar(S)     ; main
+   sc  = stringtochar(s)     ; subset
+
+   nSC = dimsizes( SC ) - 1  ; extra 'end of char' at end
+   nsc = dimsizes( sc ) - 1
+
+   sTF = False
+   if (nsc.le.nSC) then      ; nsc must be <= nSC
+       do n=0,nSC-nsc
+          if (all(SC(n:n+nsc-1).eq.sc(0:nsc-1)) ) then
+              sTF = True
+              return (sTF)
+          end if
+       end do
+   end if
+   
+   return (sTF)
+end
+; ----------------------
+undef("indStrSubset")
+function indStrSubset(S[1]:string, s[1]:string)
+; return the indices of the characters
+; of "S" of which "s" is a subset. 
+local SC, sc, nsc, nSC, n, ii
+begin
+
+   if (ismissing(S) .or. ismissing(s)) then
+       print("indStrSubset: missing string")
+       imsg = default_fillvalue("integer")
+       ii = (/imsg,imsg/)
+       ii@_FillValue = imsg
+       return(ii)
+   end if
+
+   SC  = stringtochar(S)     ; main
+   sc  = stringtochar(s)     ; subset
+
+   nSC = dimsizes( SC ) - 1  ; extra 'end of char' at end
+   nsc = dimsizes( sc ) - 1
+
+   if (nsc.le.nSC) then      ; nsc must be <= nSC
+       do n=0,nSC-nsc
+          if (all(SC(n:n+nsc-1).eq.sc(0:nsc-1)) ) then
+              ii  = ispan(n,n+nsc-1,1)
+              return( ii )
+          end if
+       end do
+   end if
+
+   ii = new ( 1, integer)
+   return (ii)
+end
+
+;***********************************************************************;
+; Unpacks a bit-field from an integer-typed "host" variable.            ; 
+; Behaves similarly to dim_gbits(), and is implemented in terms of      ;
+; dim_gbits(), with a couple of differences. First, the use-case is     ;
+; inspired by satellite formats that pack multiple bit fields into a    ;
+; variable. These formats tend to denote the bits right-to-left, or     ;
+; least-significant to most-significant. This function uses that        ;
+; convention, unlike dim_gbits, which numbers left-to-right. And        ;
+; because bit-fields are uniformily aligned with the hosting type (ie.  ;
+; always the same position and length within the type), the arguments   ;
+; for this function are simpler than dim_gbits(): a starting bit and a  ;
+; length. dim_gbits() is more general in that it would allow for bit-   ;
+; fields that crossed host-type boundaries and/or where not modulo the  ;
+; host-type size. Finally, this function extracts the bit-field across  ;
+; all dimensions of the input variable                                  ;
+;***********************************************************************;
+undef("get_bitfield")
+function get_bitfield(data:numeric, startBit:integer, numBits:integer)
+local ibit, dataType, dataTypeSize, offset, dataDims
+begin
+
+    undef("zero")
+    function zero()
+    local zeros
+    begin 
+        zeros = new(dimsizes(data), typeof(data))
+        zeros = totype(0, typeof(data))
+	return zeros
+    end	
+    
+    dataType = new((/1/), typeof(data))
+    dataTypeSize = sizeof(dataType) * 8              ; size in bits
+    
+    if (startBit.gt.dataTypeSize) then
+        print("get_bitfield: start-bit exceeds size of the datatype: " + startBit + " vs. " + dataTypeSize)
+        print("get_bitfield: returning zeros")
+        return zero()
+    end if 
+
+    if (startBit-numBits+1.lt.0) then
+        print("get_bitfield: startBit+numBits spills past right-hand-size of the datatype")
+        print("get_bitfield: returning zeros")
+        return zero()
+    end if 
+
+    offset = dataTypeSize - startBit - 1
+    dataDims = dimsizes(data)
+    return onedtond(dim_gbits(ndtooned(data), offset, numBits, dataTypeSize - numBits, dim_product(dataDims)), dataDims)
+end
+
+;***********************************************************************
+; Are 'x' and 'y' array conformant
+; Return logical True if so; return logical False
+;***********************************************************************
+undef("isconform")
+function isconform(x, y)
+;
+; Are variables conformant (size and shape [rank])?
+; USAGE: result = isconform(t, td)  
+;
+local result, dimx, dimy, rankx, ranky, longname_print
+begin
+;
+; scalars are automatically conformable to any array
+; if either argument is a scalar ... return(True)
+; -----
+  result = True    ; default is arrays are conformant 
+
+  if (.not.(isscalar(x) .or. isscalar(y))) then
+      dimx  = dimsizes(x)
+      dimy  = dimsizes(y)
+      rankx = dimsizes(dimx)
+      ranky = dimsizes(dimy)
+      if (rankx.ne.ranky .or. .not.all(dimx.eq.dimy)) then
+          result = False        ; arrays are NOT conformant
+      end if          ; 
+  end if              ;   scalar test 
+
+  return(result)
+end
+;***********************************************************************
+undef("isconform_print")
+function isconform_print(x, y, printInfo[1]:logical)
+;
+; Are variables the same structure (size and shape [rank])?
+; USAGE: 
+;    result = isconform_print(t, td, True ) ; return True/False
+;                                           ; print dimension information
+;    result = isconform_print(t, td, False) ; return True/False
+;                                           ; no print
+;
+local result, dimx, dimy, rankx, ranky
+begin
+;
+; Scalars are automatically conformable to any array
+; so if either argument is a scalar ... return(True)
+;
+  result = isconform(x, y)
+
+  if (.not.result .and. printInfo) then
+      print("")
+      if (isatt(x,"long_name")) then
+          print("isconform_print: var_1: "+x@long_name)
+      else
+          print("isconform_print: var_1: no variable long_name")
+      end if
+
+      if (isatt(y,"long_name")) then
+          print("isconform_print: var_2: "+y@long_name)
+      else
+          print("isconform_print: var_2: no variable long_name")
+      end if
+
+      dimx  = dimsizes(x)
+      dimy  = dimsizes(y)
+      rankx = dimsizes(dimx)
+      ranky = dimsizes(dimy)
+
+      if (rankx.ne.ranky) then
+          print("isconform_print: rank mismatch: rank_var_1 = "+rankx+ \
+                                             " : rank_var_2 = "+ranky)
+          print("                 dim_var_1 = "+dimx )
+          print("")
+          print("                 dim_var_2 = "+dimy )
+          print("")
+
+      elseif (.not.all(dimx.eq.dimy)) then
+
+          print("isconform_print: rank match: rank_var_1 = "+rankx+ \
+                                          " ; rank_var_2 = "+ranky)
+          print("isconform_print: sizes differ: dim_var_1 = "+dimx+\
+                                          " ; dim_var_2 = "+dimy)
+          print("")
+      end if      ; rankx.ne.ranky
+  end if          ; .not.result .and. printInfo  
+
+  return(result)
+end

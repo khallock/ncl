@@ -675,6 +675,9 @@ void
 #endif
 );
 
+extern NhlErrorTypes _Nclsubprocess(void);
+extern NhlErrorTypes _NclsubprocessWait(void);
+
 extern NhlErrorTypes _Nclstrlen(
 #if NhlNeedProto
 void
@@ -1198,6 +1201,19 @@ void _NclAddBuiltIns
 	dimsizes[0] = 1;
 	SetArgTemplate(args,0,"string",1,dimsizes);nargs++;
 	NclRegisterFunc(_Nclsystemfunc,args,"systemfunc",nargs);
+
+	nargs = 0;
+	args = NewArgs(1);
+	dimsizes[0] = 1;
+	SetArgTemplate(args,nargs++,"string",1,dimsizes);
+	NclRegisterFunc(_Nclsubprocess,args,"subprocess",nargs);
+
+	nargs = 0;
+	args = NewArgs(2);
+	dimsizes[0] = 1;
+	SetArgTemplate(args,nargs++,"integer",1,dimsizes);
+	SetArgTemplate(args,nargs++,"logical",1,dimsizes);
+	NclRegisterFunc(_NclsubprocessWait,args,"subprocess_wait",nargs);
 
 	nargs = 0;
 	args = NewArgs(1);
@@ -1842,7 +1858,7 @@ void _NclAddBuiltIns
 
 	nargs = 0;
 	args = NewArgs(1);
-	SetArgTemplate(args,nargs,"numeric",0,NclANY); nargs++;
+	SetArgTemplate(args,nargs,"snumeric",0,NclANY); nargs++;
 	NclRegisterFunc( _Nclproduct,args,"product",nargs);
 
 	nargs = 0;
@@ -2267,17 +2283,47 @@ void _NclAddBuiltIns
 	SetArgTemplate(args,3,"logical",1,dimsizes);nargs++;
 	NclRegisterFunc(_NclCreateGraphic,args,"create_graphic",nargs);
 
+/* 
+ * In NCL V6.5.0, three aliases were added for the versatile "getvardims" 
+ * function, to make it less confusing about which functions to use on files 
+ * versus variables:
+ *
+ *    getvardimnames - an alias for getvardims
+ *    getfiledimnames - an alias for getvardims, but limited to a file pointer
+ *        (to be used with getfiledimsizes). 
+ *    getfiledims - another alias for getvardims, but limited to a file pointer.
+ *        This is simply to be consistent with the fact there is already a 
+ *        "getvardims" function.
+ */
 	nargs = 0;
 	args = NewArgs(1);
 	dimsizes[0] = 1;
 	SetArgTemplate(args,0,NclANY,0,NclANY);nargs++;
 	NclRegisterFunc(_NclIGetVarDims,args,"getvardims",nargs);
+	NclRegisterFunc(_NclIGetVarDims,args,"getvardimnames",nargs);
+
+	nargs = 0;
+	args = NewArgs(1);
+	dimsizes[0] = 1;
+	SetArgTemplate(args,0,"file",0,NclANY);nargs++;
+	NclRegisterFunc(_NclIGetVarDims,args,"getfiledims",nargs);
+	NclRegisterFunc(_NclIGetVarDims,args,"getfiledimnames",nargs);
 
 	nargs = 0;
 	args = NewArgs(1);
 	dimsizes[0] = 1;
 	SetArgTemplate(args,0,NclANY,0,NclANY);nargs++;
 	NclRegisterFunc(_NclIGetVarAtts,args,"getvaratts",nargs);
+/* 
+ * In NCL V6.5.0, getfileatts was added as an alias to getvaratts to 
+ * make it less confusing about which functions to use on files 
+ * versus variables:
+ */
+	nargs = 0;
+	args = NewArgs(1);
+	dimsizes[0] = 1;
+	SetArgTemplate(args,0,"file",0,NclANY);nargs++;
+	NclRegisterFunc(_NclIGetVarAtts,args,"getfileatts",nargs);
 
 	nargs = 0;
 	args = NewArgs(2);
@@ -2330,6 +2376,11 @@ void _NclAddBuiltIns
 	SetArgTemplate(args,0,"file",0,NclANY);nargs++;
 	SetArgTemplate(args,1,"string",1,dimsizes);nargs++;
 	NclRegisterFunc(_NclIGetFileVarDims,args,"getfilevardims",nargs);
+/* 
+ * In NCL V6.5.0, added a "getfilevardimnames" alias for getfilevardims, 
+ * to better fit with getfilevardimsizes which returns the dimension sizes.
+ */
+	NclRegisterFunc(_NclIGetFileVarDims,args,"getfilevardimnames",nargs);
 
 	nargs = 0;
 	args = NewArgs(2);
@@ -2344,6 +2395,9 @@ void _NclAddBuiltIns
 	SetArgTemplate(args,0,"file",1,dimsizes);nargs++;
 	SetArgTemplate(args,1,"string",1,dimsizes);nargs++;
 	NclRegisterFunc(_NclIFileVarDimsizes,args,"filevardimsizes",nargs);
+
+	/* For consistency purposes, this is the preferred function to use 
+           over "filevardimsizes". */
 	nargs = 0;
 	args = NewArgs(2);
 	dimsizes[0] = 1;

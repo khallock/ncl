@@ -62,7 +62,6 @@ NhlErrorTypes stat2_W( void )
   int ndims_nptused;
   ng_size_t dsizes_nptused[NCL_MAX_DIMENSIONS];
   int ndims_out;
-  ng_size_t *dsizes_out;
   NclBasicDataTypes type_xmean, type_xvar;
 /*
  * various
@@ -105,13 +104,6 @@ NhlErrorTypes stat2_W( void )
   }
   inpts = (int) npts;
 
-/*
- * Calculate what the size is supposed to be of our output arrays.
- */
-  ndims_out = max(ndims_x-1,1);
-  dsizes_out = (ng_size_t*)NclMalloc(ndims_out*sizeof(ng_size_t));
-  dsizes_out[0] = 1;
-  for(i = 0; i < ndims_x-1; i++ ) dsizes_out[i] = dsizes_x[i];
 /* 
  * Get output variables.
  */
@@ -144,13 +136,31 @@ NhlErrorTypes stat2_W( void )
            1);
 
 /*
- * The number of dimensions in all arrays must be the same.
+ * Check the dimensions.
  */
-  if( ndims_xmean != ndims_out || ndims_nptused != ndims_out || 
-      ndims_xvar != ndims_out ) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: The number of dimensions of xmean, xvar, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is just a 1-d array)");
-    return(NhlFATAL);
+  ndims_out = max(ndims_x-1,1);
+  if(ndims_x == 1) {
+    if((!is_scalar(ndims_xmean,dsizes_xmean) || 
+        !is_scalar(ndims_xvar,dsizes_xvar) ||
+        !is_scalar(ndims_nptused,dsizes_nptused))) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: If x is a one-dimensional array, then xmean, xvar, and nptused must be scalars.");
+    }
   }
+  else { /* ndims_x > 1 */
+    if(ndims_xmean != ndims_out || ndims_nptused != ndims_out || ndims_xvar != ndims_out ) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: The number of dimensions of xmean, xvar, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is a one-dimensional array)");
+      return(NhlFATAL);
+    }
+    for(i = 0; i < ndims_out; i++ ) {
+      if( dsizes_xmean[i]   != dsizes_x[i] || 
+          dsizes_xvar[i]    != dsizes_x[i] || 
+          dsizes_nptused[i] != dsizes_x[i] ) {
+        NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: The dimensions of xmean, xvar, and nptused must be the same as the leftmost dimensions of x");
+        return(NhlFATAL);
+      }
+    }
+  }
+
 /*
  * The output types must be float or double.
  */
@@ -159,17 +169,7 @@ NhlErrorTypes stat2_W( void )
     NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: The types of the output arrays must all be float or double");
     return(NhlFATAL);
   }
-/*
- * Dimension sizes of xmean, xvar, and nptused must be the same.
- */
-  for(i = 0; i < ndims_out; i++ ) {
-      if( dsizes_xmean[i]   != dsizes_out[i] || 
-          dsizes_xvar[i]    != dsizes_out[i] || 
-          dsizes_nptused[i] != dsizes_out[i] ) {
-        NhlPError(NhlFATAL,NhlEUNKNOWN,"stat2: The dimensions of xmean, xvar, and nptused must be the same as the left-most dimensions of x");
-        return(NhlFATAL);
-      }
-  }
+
 /*
  * Create double precision arrays if necessary.
  */
@@ -239,7 +239,6 @@ NhlErrorTypes stat2_W( void )
   if(type_x     != NCL_double) NclFree(tmp_x);
   if(type_xmean != NCL_double) NclFree(tmp_xmean);
   if(type_xvar  != NCL_double) NclFree(tmp_xvar);
-  NclFree(dsizes_out);
   
   return(NhlNOERROR);
 }
@@ -271,7 +270,6 @@ NhlErrorTypes stat_trim_W( void )
   int ndims_nptused;
   ng_size_t dsizes_nptused[NCL_MAX_DIMENSIONS];
   int ndims_out;
-  ng_size_t *dsizes_out;
   NclBasicDataTypes type_xmeant, type_xsdt;
 /*
  * various
@@ -327,13 +325,6 @@ NhlErrorTypes stat_trim_W( void )
  */
   size_leftmost = 1;
   for(i = 0; i < ndims_x-1; i++) size_leftmost *= dsizes_x[i];
-/*
- * Calculate what the size is supposed to be of our output arrays.
- */
-  ndims_out = max(ndims_x-1,1);
-  dsizes_out = (ng_size_t*)NclMalloc(ndims_out*sizeof(ng_size_t));
-  dsizes_out[0] = 1;
-  for(i = 0; i < ndims_x-1; i++ ) dsizes_out[i] = dsizes_x[i];
 /* 
  * Get output variables.
  */
@@ -368,22 +359,29 @@ NhlErrorTypes stat_trim_W( void )
            1);
 
 /*
- * Check # of dimensions. 
+ * Check the dimensions. 
  */
-  if( ndims_xmeant != ndims_out || ndims_nptused != ndims_out || 
-      ndims_xsdt != ndims_out ) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_trim: The number of dimensions of xmeant, xsdt, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is just a 1-d array)");
-    return(NhlFATAL);
-  }
-/*
- * Check dimension sizes of xmeant, xsdt, and nptused.
- */
-  for(i = 0; i < ndims_out; i++ ) {
-    if( dsizes_xmeant[i]  != dsizes_out[i] || 
-        dsizes_xsdt[i]    != dsizes_out[i] || 
-        dsizes_nptused[i] != dsizes_out[i] ) {
-      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_trim: The dimensions of xmeant, xsdt, and nptused must be the same as the left-most dimensions of x");
+  ndims_out = max(ndims_x-1,1);
+  if(ndims_x == 1) {
+    if(!is_scalar(ndims_xmeant,dsizes_xmeant) || 
+       !is_scalar(ndims_xsdt,dsizes_xsdt) ||
+       !is_scalar(ndims_nptused,dsizes_nptused)) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_trim: If x is a one-dimensional array, then xmeant, xsdt, and nptused must be scalars.");
       return(NhlFATAL);
+    }
+  }
+  else { /* ndims_x > 1 */
+    if(ndims_xmeant != ndims_out || ndims_nptused != ndims_out || ndims_xsdt != ndims_out ) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_trim: The number of dimensions of xmeant, xsdt, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is a one-dimensional array)");
+      return(NhlFATAL);
+    }
+    for(i = 0; i < ndims_out; i++ ) {
+      if( dsizes_xmeant[i]  != dsizes_x[i] || 
+          dsizes_xsdt[i]    != dsizes_x[i] || 
+          dsizes_nptused[i] != dsizes_x[i] ) {
+        NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_trim: The dimensions of xmeant, xsdt, and nptused must be the same as the leftmost dimensions of x");
+        return(NhlFATAL);
+      }
     }
   }
 
@@ -483,7 +481,6 @@ NhlErrorTypes stat_trim_W( void )
   if(type_xmeant != NCL_double) NclFree(tmp_xmeant);
   if(type_xsdt   != NCL_double) NclFree(tmp_xsdt);
   NclFree(work);
-  NclFree(dsizes_out);
 
   return(NhlNOERROR);
 }
@@ -521,7 +518,6 @@ NhlErrorTypes stat4_W( void )
   int ndims_nptused;
   ng_size_t dsizes_nptused[NCL_MAX_DIMENSIONS];
   int ndims_out;
-  ng_size_t *dsizes_out;
   NclBasicDataTypes type_xmean, type_xvar, type_xskew, type_xkurt;
 /*
  * various
@@ -566,13 +562,6 @@ NhlErrorTypes stat4_W( void )
  */
   size_leftmost = 1;
   for(i = 0; i < ndims_x-1; i++) size_leftmost *= dsizes_x[i];
-/*
- * Calculate what the size is supposed to be of our output arrays.
- */
-  ndims_out  = max(ndims_x-1,1);
-  dsizes_out = (ng_size_t*)NclMalloc(ndims_out*sizeof(ng_size_t));
-  dsizes_out[0] = 1;
-  for(i = 0; i < ndims_x-1; i++ ) dsizes_out[i] = dsizes_x[i];
 /* 
  * Get output variables.
  */
@@ -624,12 +613,34 @@ NhlErrorTypes stat4_W( void )
 /*
  * The number of dimensions in all arrays must be the same.
  */
-  if( ndims_xmean != ndims_out || ndims_nptused != ndims_out || 
-      ndims_xskew != ndims_out || ndims_xkurt != ndims_out || 
-      ndims_xvar != ndims_out ) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: The number of dimensions of xmean, xvar, xskew, xkurt, and nptused must be one less than the number of dimensions of x, or they must all be scalar if x is a one-dimensional array)");
-    return(NhlFATAL);
+  ndims_out = max(ndims_x-1,1);
+  if(ndims_x == 1) {
+    if(!is_scalar(ndims_xmean,dsizes_xmean) || 
+       !is_scalar(ndims_xvar,dsizes_xvar) ||
+       !is_scalar(ndims_xskew,dsizes_xskew) ||
+       !is_scalar(ndims_xkurt,dsizes_xkurt) ||
+       !is_scalar(ndims_nptused,dsizes_nptused)) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: If x is a one-dimensional array, then xmean, xvar, xskew, xkurt, and nptused must be scalars.");
+    }
   }
+  else { /* ndims_x > 1 */
+    if(ndims_xmean != ndims_out || ndims_xvar != ndims_out  || ndims_xskew != ndims_out || 
+       ndims_xkurt !=ndims_out || ndims_nptused != ndims_out) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: The number of dimensions of xmean, xvar, xskew, xkur, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is a one-dimensional array)");
+      return(NhlFATAL);
+    }
+    for(i = 0; i < ndims_out; i++ ) {
+      if( dsizes_xmean[i]   != dsizes_x[i] || 
+          dsizes_xvar[i]    != dsizes_x[i] || 
+          dsizes_xskew[i]   != dsizes_x[i] ||
+          dsizes_xkurt[i]   != dsizes_x[i] || 
+          dsizes_nptused[i] != dsizes_x[i] ) {
+        NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: The number of dimensions of xmean, xvar, xskew, xkurt, and nptused must be one less than the number of dimensions of x, or they must all be scalar if x is a one-dimensional array)");
+        return(NhlFATAL);
+      }
+    }
+  }
+
 /*
  * The output types must be float or double.
  */
@@ -640,19 +651,7 @@ NhlErrorTypes stat4_W( void )
     NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: The types of the output arrays must all be float or double");
     return(NhlFATAL);
   }
-/*
- * Dimension sizes of xmean, xvar, xskew, xkurt, and nptused must be the same.
- */
-  for(i = 0; i < ndims_out; i++ ) {
-    if( dsizes_xmean[i]   != dsizes_out[i] || 
-        dsizes_xvar[i]    != dsizes_out[i] || 
-        dsizes_xskew[i]   != dsizes_out[i] ||
-        dsizes_xkurt[i]   != dsizes_out[i] || 
-        dsizes_nptused[i] != dsizes_out[i] ) {
-      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat4: xmean, xskew, xkurt, xvar, and nptused must be the same as the leftmost dimensions of x");
-      return(NhlFATAL);
-    }
-  }
+
 /*
  * Create double precision arrays if necessary.
  */
@@ -757,7 +756,6 @@ NhlErrorTypes stat4_W( void )
   if(type_xvar  != NCL_double) NclFree(tmp_xvar);
   if(type_xskew != NCL_double) NclFree(tmp_xskew);
   if(type_xkurt != NCL_double) NclFree(tmp_xkurt);
-  NclFree(dsizes_out);
 
   return(NhlNOERROR);
 }
@@ -835,10 +833,7 @@ NhlErrorTypes stat_medrng_W( void )
  */
   size_leftmost = 1;
   for(i = 0; i < ndims_x-1; i++) size_leftmost *= dsizes_x[i];
-/*
- * Calculate what the size is supposed to be of our output arrays.
- */
-  ndims_out = max(ndims_x-1,1);
+
 /* 
  * Get output variables.
  */
@@ -883,25 +878,33 @@ NhlErrorTypes stat_medrng_W( void )
            1);
 
 /*
- * Check the number of dimensions.
+ * Check the dimensions.
  */
-  if( ndims_xmedian != ndims_out || ndims_nptused != ndims_out || 
-      ndims_xrange != ndims_out || ndims_xmrange != ndims_out ) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_medrng: The number of dimensions of xmedian, xmrange, xrange, and nptused must be one less than the number of dimensions of x (or they must all be scalar if x is just a 1-d array)");
-    return(NhlFATAL);
-  }
-/*
- * Check the dimension sizes of xmedian, xrange, and nptused.
- */
-  for(i = 0; i < ndims_out; i++ ) {
-    if( dsizes_xmedian[i] != dsizes_x[i] || 
-        dsizes_xmrange[i] != dsizes_x[i] ||
-        dsizes_xrange[i]  != dsizes_x[i] || 
-        dsizes_nptused[i] != dsizes_x[i] ) {
-      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_medrng: The dimensions of xmedian, xrange, xmrange, and nptused must be the same as the left-most dimensions of x");
-      return(NhlFATAL);
+  ndims_out = max(ndims_x-1,1);
+  if(ndims_x == 1) {
+    if(!is_scalar(ndims_xmedian,dsizes_xmedian) || 
+       !is_scalar(ndims_xmrange,dsizes_xmrange) ||
+       !is_scalar(ndims_xrange,dsizes_xrange) || 
+       !is_scalar(ndims_nptused,dsizes_nptused)) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_medrng: If x is a one-dimensional array, then xmedian, xrange, xmrange, and nptused must be scalars.");
     }
   }
+  else {   /*  ndims_x > 1 */
+    if( ndims_xmedian != ndims_out || ndims_nptused != ndims_out || 
+        ndims_xrange  != ndims_out || ndims_xmrange != ndims_out ) {
+      NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_medrng: The dimensions of xmedian, xrange, xmrange, and nptused must be the same as the leftmost dimensions of x");
+    }
+    for(i = 0; i < ndims_out; i++ ) {
+      if( dsizes_xmedian[i] != dsizes_x[i] || 
+          dsizes_xmrange[i] != dsizes_x[i] ||
+          dsizes_xrange[i]  != dsizes_x[i] || 
+          dsizes_nptused[i] != dsizes_x[i] ) {
+        NhlPError(NhlFATAL,NhlEUNKNOWN,"stat_medrng: The dimensions of xmedian, xrange, xmrange, and nptused must be the same as the leftmost dimensions of x");
+        return(NhlFATAL);
+      } 
+    }
+  }
+
 /*
  * The output types must be float or double.
  */
@@ -2848,6 +2851,216 @@ NhlErrorTypes esacr_W( void )
   return(ret);
 }
 
+NhlErrorTypes esacr_n_W( void )
+{
+/*
+ * Input array variables
+ */
+  void *x;
+  double *tmp_x = NULL;
+  int ndims_x;
+  ng_size_t dsizes_x[NCL_MAX_DIMENSIONS];
+  int has_missing_x;
+  NclScalar missing_x, missing_dx, missing_rx;
+  NclBasicDataTypes type_x;
+  int *mxlag, mxlag1;
+  int *dim;
+/*
+ * Output array variables
+ */
+  void *acr;
+  double *tmp_acr, *tmp_acv;
+  ng_size_t *dsizes_acr;
+  NclScalar missing_acr;
+  NclBasicDataTypes type_acr;
+/*
+ * various
+ */
+  ng_size_t index_nri, index_nro, index_x, index_acr, total_size_acr;
+  ng_size_t i, j, nl, nr, nri, nro, npts;
+  int ier = 0, ier_count2 = 0, ier_count5 = 0;
+  int inpts, ret;
+  double xmean, xvar;
+/*
+ * Retrieve parameters
+ *
+ * Note any of the pointer parameters can be set to NULL, which
+ * implies you don't care about its value.
+ */
+  x = (void*)NclGetArgValue(
+           0,
+           3,
+           &ndims_x, 
+           dsizes_x,
+           &missing_x,
+           &has_missing_x,
+           &type_x,
+           DONT_CARE);
+/*
+ * Get second argument.
+ */
+  mxlag = (int*)NclGetArgValue(
+           1,
+           3,
+           NULL,
+           NULL,
+           NULL,
+           NULL,
+           NULL,
+           DONT_CARE);
+
+
+  dim = (int*)NclGetArgValue(
+           2,
+           3,
+           NULL,
+           NULL,
+           NULL,
+           NULL,
+           NULL,
+           DONT_CARE);
+/*
+ * Calculate size of dimension to do the calculation on and do
+ * error checking at the same time.
+ */
+  if(*dim < 0 || *dim >= ndims_x) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: Invalid dimension index specified by third argument, can't continue");
+    return(NhlFATAL);
+  }
+  npts = dsizes_x[*dim];
+
+/*
+ * Check input dimension size
+ */
+  if(npts > INT_MAX) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: npts = %ld is greater than INT_MAX", npts);
+    return(NhlFATAL);
+  }
+  inpts = (int) npts;
+
+/*
+ * Check mxlag
+ */
+  if( *mxlag < 0 || *mxlag > inpts ) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: mxlag must be between 0 and %d",inpts);
+    return(NhlFATAL);
+  }
+  mxlag1 = *mxlag + 1;
+
+/*
+ * Calculate size of leftmost dimensions (nl) up to the dim-th
+ *   dimension.
+ * Calculate size of rightmost dimensions (nr) from the
+ *   dim-th dimension.
+ *
+ * The dimension to do the calculation across is "dim".
+ *
+ * Also set output dimension sizes while here.
+ */
+  dsizes_acr = (ng_size_t*)calloc(ndims_x,sizeof(ng_size_t));
+  if (dsizes_acr == NULL) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: Unable to allocate space for output arrays" );
+    return(NhlFATAL);
+  }
+
+  nl = nr = 1;
+  if(ndims_x > 1) {
+    for(i = 0; i < *dim ; i++) {
+      nl = nl*dsizes_x[i];
+      dsizes_acr[i] = dsizes_x[i];
+    }
+    for(i = *dim+1; i < ndims_x; i++) {
+      nr = nr*dsizes_x[i];
+      dsizes_acr[i] = dsizes_x[i];
+    }
+  }
+  dsizes_acr[*dim] = mxlag1;
+
+/* 
+ * Get size of output variables.
+ */
+  total_size_acr = nr * nl * mxlag1;
+/*
+ * Coerce missing values, if any.
+ */
+  coerce_missing(type_x,has_missing_x,&missing_x,&missing_dx,&missing_rx);
+/*
+ * Coerce x to double if necessary.
+ */
+  tmp_x   = (double*)calloc(npts,sizeof(double));
+  tmp_acr = (double*)calloc(mxlag1,sizeof(double));
+  tmp_acv = (double*)calloc(mxlag1,sizeof(double));
+  if( tmp_x == NULL || tmp_acr == NULL || tmp_acv == NULL) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: Unable to allocate memory for temporary double precision arrays");
+    return(NhlFATAL);
+  }
+  if(type_x != NCL_double) {
+    type_acr = NCL_float;
+    missing_acr = missing_rx;
+    acr = (void*)calloc(total_size_acr,sizeof(float));
+  }
+  else {
+    type_acr = NCL_double;
+    missing_acr = missing_dx;
+    acr = (void*)calloc(total_size_acr,sizeof(double));
+  }
+  if(acr == NULL) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"esacr_n: Unable to allocate memory for output array");
+    return(NhlFATAL);
+  }
+
+/*
+ * Call the f77 version of 'desauto' with the full argument list.
+ */
+  index_x = index_acr = 0;
+  nri = nr * npts;    
+  nro = nr * mxlag1;
+  for( i = 0; i < nl; i++ ) {
+    index_nri = i*nri;
+    index_nro = i*nro;
+    for( j = 0; j < nr; j++ ) {
+      index_x   = index_nri+j;
+      index_acr = index_nro+j;
+/*
+ * Coerce subsection of x (tmp_x) to double.
+ */
+      coerce_subset_input_double_step(x,tmp_x,index_x,nr,type_x,
+                                      npts,0,NULL,NULL);
+      xvar = xmean = missing_dx.doubleval;
+
+      NGCALLF(desauto,DESAUTO)(tmp_x,&inpts,&missing_dx.doubleval,&xmean,
+                               &xvar,mxlag,tmp_acv,tmp_acr,&ier);
+
+      if (ier == -2) ier_count2++;
+      if (ier == -5) ier_count5++;
+
+      coerce_output_float_or_double_step(acr,tmp_acr,type_acr,mxlag1,
+                                         index_acr,nr);
+    }
+  }
+/*
+ * Check errors.
+ */
+  if (ier_count2) {
+    NhlPError(NhlWARNING,NhlEUNKNOWN,"esacr_n: %d rightmost sections of the input array contained all missing values",ier_count2);
+  }
+  if (ier_count5) {
+    NhlPError(NhlWARNING,NhlEUNKNOWN,"esacr_n: the sample variance was zero for %d input array(s).\nAll values of a series are constant.",ier_count5);
+  }
+/*
+ * Free memory.
+ */
+  NclFree(tmp_x);
+  NclFree(tmp_acr);
+  NclFree(tmp_acv);
+/*
+ * Return values. 
+ */
+  ret = NclReturnValue(acr,ndims_x,dsizes_acr,&missing_acr,type_acr,0);
+  NclFree(dsizes_acr);
+  return(ret);
+}
+
 NhlErrorTypes esacv_W( void )
 {
 /*
@@ -3400,7 +3613,7 @@ NhlErrorTypes dim_num_W( void)
            NULL,
            DONT_CARE);
 /*
- * Calculate the product of the dimension sizes for the first n-1 
+ * Calculate the product of the dimension sizes for the leftmost n-1 
  * dimensions (size_leftmost).
  */
   ndims_num     = max(ndims_input-1,1);
@@ -3686,7 +3899,7 @@ NhlErrorTypes esccr_shields_W( void )
   mxlag1 = *mxlag + 1;
 /*
  * Compute the total number of elements in our x and y arrays.
- * Don't count the first dimension (ncases), because this is
+ * Don't count the leftmost dimension (ncases), because this is
  * a special dimension.
  */
   total_size_x1 = 1;
@@ -4235,7 +4448,7 @@ NhlErrorTypes dim_stat4_W( void )
   inpts = (int) npts;
 
 /*
- * Compute the total number of lefmost and rightmost elements in our x array.
+ * Compute the total number of leftmost and rightmost elements in our x array.
  */
   total_leftmost = 1;
   for(i = 0; i < ndims_x-1; i++) total_leftmost *= dsizes_x[i];
@@ -4579,19 +4792,14 @@ NhlErrorTypes dim_acumrun_n_W( void )
            NULL,
            DONT_CARE);
 
-  if(*lrun < 2) {
-    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_acumrun_n: 'lrun' must be >= 2");
-    return(NhlFATAL);
-  }
-
+/*
+ * Some error checking. Make sure input parameters are valid.
+ */
   if(*opt !=0  && *opt != 1) {
     NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_acumrun_n: 'opt' must be 0 or 1");
     return(NhlFATAL);
   }
 
-/*
- * Some error checking. Make sure input dimensions are valid.
- */
   for(i = 0; i < ndims; i++ ) {
     if(dims[i] < 0 || dims[i] >= ndims_x) {
       NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_acumrun_n: Invalid dimension sizes for accumulated sum dimension, can't continue");
@@ -4620,6 +4828,11 @@ NhlErrorTypes dim_acumrun_n_W( void )
   }
   total_elements = total_nr * total_nl;
   total_size_x   = total_elements * npts;
+
+  if(*lrun < 2 || *lrun > npts) {
+    NhlPError(NhlFATAL,NhlEUNKNOWN,"dim_acumrun_n: 'lrun' must be >= 2 and <= the number of values represented by the 'dims' argument (%ld)",npts);
+    return(NhlFATAL);
+  }
 
 /*
  * Check input dimension size
@@ -4683,5 +4896,3 @@ NhlErrorTypes dim_acumrun_n_W( void )
   NclFree(tmp_x);
   return(NclReturnValue(acr,ndims_x,dsizes_x,&missing_rx,type_acr,0));
 }
-
-

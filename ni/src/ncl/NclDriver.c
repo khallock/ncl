@@ -11,16 +11,19 @@ int quark_comp(const void *q1, const void *q2)
 	return(strcmp((const char*)NrmQuarkToString(*(NrmQuark *)q1),(const char*)NrmQuarkToString(*(NrmQuark *) q2)));
 }
 
-static int numberOfPreloadedScripts = 8;
+static int numberOfPreloadedScripts = 11;
 
-char *preload_scripts[8] = {"$NCARG_ROOT/lib/ncarg/nclscripts/utilities.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/contributed.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/shea_util.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/bootstrap.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/csm/extval.ncl",
-                            "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl"};
+char *preload_scripts[11] = {"$NCARG_ROOT/lib/ncarg/nclscripts/utilities.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl", /* must be loaded after gsn_code.ncl */
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/contributed.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/shea_util.ncl", /* must be loaded after contributed.ncl */
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/bootstrap.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/extval.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/crop.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/csm/heat_stress.ncl",
+                             "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl" /* must be loaded after contributed.ncl */};
 
 int NclDriver(int argc, char **argv)
 {
@@ -122,7 +125,7 @@ int NclDriver(int argc, char **argv)
      *  -Q      override: don't echo copyright notice (unannounced option)
      */
     opterr = 0;     /* turn off getopt() msgs */
-    while ((c = getopt (argc, argv, "fhnodgmxVXQps")) != -1) {
+    while ((c = getopt (argc, argv, "fhnodgmxVXQpsP")) != -1) {
         switch (c) {
             case 'p':
                 NCLnoSysPager = 1;
@@ -177,8 +180,12 @@ int NclDriver(int argc, char **argv)
                 NCLuseAFS = 1;
                 break;
 
+            case 'P':
+                NCLprofiler = 1;
+                break;
+
             case 'h':
-                (void) fprintf(stdout, "Usage: ncl -fhnopxQV <args> <file.ncl>\n");
+                (void) fprintf(stdout, "Usage: ncl -fhnopxsPQV <args> <file.ncl>\n");
 	        (void) fprintf(stdout, "\t -f: use new file structure and NetCDF4 features when possible\n");
                 (void) fprintf(stdout, "\t -h: print this message and exit\n");
                 (void) fprintf(stdout, "\t -n: don't enumerate values in print()\n");
@@ -186,6 +193,7 @@ int NclDriver(int argc, char **argv)
                 (void) fprintf(stdout, "\t -p: don't page output from the system() command\n");
                 (void) fprintf(stdout, "\t -x: echo NCL commands\n");
                 (void) fprintf(stdout, "\t -s: disable pre-loading of default script files\n");
+                (void) fprintf(stdout, "\t -P: enable NCL profiler\n");
                 (void) fprintf(stdout, "\t -Q: turn off echo of NCL version and copyright info\n");
                 (void) fprintf(stdout, "\t -V: print NCL version and exit\n");
 #ifdef NCLDEBUG
@@ -213,7 +221,7 @@ int NclDriver(int argc, char **argv)
      */
     if (!NCLnoCopyright) 
         (void) fprintf(stdout,
-            " Copyright (C) 1995-2017 - All Rights Reserved\n University Corporation for Atmospheric Research\n NCAR Command Language Version %s\n The use of this software is governed by a License Agreement.\n See http://www.ncl.ucar.edu/ for more details.\n", GetNCLVersion());
+            " Copyright (C) 1995-2018 - All Rights Reserved\n University Corporation for Atmospheric Research\n NCAR Command Language Version %s\n The use of this software is governed by a License Agreement.\n See http://www.ncl.ucar.edu/ for more details.\n", GetNCLVersion());
 
     if (NCLnoPreload) {
 	    numberOfPreloadedScripts = 0;

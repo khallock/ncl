@@ -2673,7 +2673,9 @@ begin
  end if
      return(plot)
 end
-; ---------------------------------
+;----------------------------------------------------------------------------
+;----------------------- Unsupported: DJS -----------------------------------
+;----------------------------------------------------------------------------
 undef("SPECX_ANAL")
 function SPECX_ANAL(X[*]:numeric, iopt[1]:integer, jave[1]:integer, pct[1]:numeric)
 ;
@@ -2739,7 +2741,94 @@ begin
   
    return( sdof )
 end
-; ----------------------------------------------
+;----------------------------------------------------------------------------
+;----------------------- Unsupported: DJS -----------------------------------
+;----------------------------------------------------------------------------
+undef("SPECX_ENSEMBLE")
+function SPECX_ENSEMBLE(X[*][*]:numeric, iopt[1]:integer, jave[1]:integer, pct[1]:numeric)
+local dimX, x, nens, N, xVari, xVaro, cf, cr, ci, px, spcx, total_area, df, frq
+    , wgts, sclVar, sdof, r1, tapcf, ens_vari, ens_varo, ens_r1, ens_px
+begin
+   dimX  = dimsizes(X)
+   nens  = dimX(0)
+   N     = dimX(1)
+
+   ens_vari = 0.0                        ; ensemble mean input  variance
+   ens_varo = 0.0                        ; ensemble mean output variance (after detrend)
+   ens_r1   = 0.0                        ; ensemble mean lag-1 auto correlation
+
+ do ne=0,nens-1
+   xVari = variance(X(ne,:))*(N-1.)/N  ; input variance
+  
+   if (iopt.ge.0) then                 ; remove mean
+       x = X(ne,:) - avg(X(ne,:))
+   else
+       x = X(ne,:)
+   end if
+
+   if (iopt.ge.1) then
+       x = dtrend(x,False)             ; step 1: detrend
+   end if
+                                       ; step 2: Calculate input sample variance 
+   xVaro = variance(x)*(N-1.)/N        ; population variance after pre-whitening
+
+   x     = taper (x,pct,0)             ; step 3: taper the series
+                                       ; tapering correction factor
+   tapcf = 0.5*(128-93*pct)/(8-5*pct)^2; Bloomfield
+  
+   cf    = ezfftf(x)                   ; step 4: perform forward FFT
+   cr    = cf(0,:)                     ; clarity ... real coef
+   ci    = cf(1,:)                     ;             imag coef
+
+   px    = cr^2 + ci^2                 ; step 5: periodogram of "x"
+   if (ne.eq.0) then
+       ens_px = new (dimsizes(px), typrof(px), "No_FillValue")
+       ens_px = 0
+   end if
+
+   r1       = esacr(x,1)               ; auto correlation at lag-1
+   ens_r1   = ens_r1 + 0.5*log((1+r1)/(1-r1))  ; Fischer z-transform
+   ens_px   = ens_px+px
+   ens_vari = ens_vari+xVari
+   ens_varo = ens_varo+xVaro
+  end do                               ; end ensemble loop
+
+   xVari = ens_vari/nens                ; ensemble mean
+   xVaro = ens_varo/nens   
+   px    = ens_px/nens
+   ens_r1= ens_r1/nens
+  
+   wgts         = fspan(1,1,jave)
+   wgts(0)      = 0.5                  ; not sure why I did this
+   wgts(jave-1) = 0.5
+   wgts         = wgts/sum(wgts)       ; normalize sum of wgts to one 
+
+   spcx  = wgt_runave(px,wgts,1)       ; weighted run ave of 
+
+  ;step 7: normalize the area under the curve [6] to the variance.
+  ;       Remember the first and last bandwidths are only 0.5*df
+   
+   df         = 1./N 
+   total_area = (spcx(0) + spcx(N/2-1))*(df/2) + sum(spcx(1:N/2-2))*df
+   sclVar     = ens_varo/total_area
+   spcx       = spcx*sclVar
+  
+   frq        = fspan(df,0.5,N/2)
+  
+   sdof       = 2/(tapcf*sum(wgts^2))  ; sum squares of normalized wgts 
+                                       ; to calculate dof 
+   sdof@bw    = 0.5*sdof*df            ; bw: jones pg 202: murphy+katz
+   sdof@xvari = xVari
+   sdof@xvaro = xVaro
+   sdof@frq   = frq
+   sdof@spcx  = spcx
+   sdof@xlag1 = (exp(2*ens_r1)-1)/(exp(2*ens_r1)+1)  ; back transform
+  
+   return( sdof )
+end
+;----------------------------------------------------------------------------
+;----------------------- Unsupported: DJS -----------------------------------
+;----------------------------------------------------------------------------
 undef("SPECXY_ANAL")
 function SPECXY_ANAL(X[*]:numeric, Y[*]:numeric   \
                     ,iopt[1]:integer, jave[1]:integer, pct[1]:numeric)
@@ -2855,7 +2944,9 @@ begin
 
    return(sdof)
 end
-; -----------------------------------
+;----------------------------------------------------------------------------
+;----------------------- Unsupported: DJS -----------------------------------
+;----------------------------------------------------------------------------
 undef("FILWGTS")
 procedure FILWGTS (nwgt[*]:integer, ihp[1]:integer \
                   ,fca[1]:numeric , fcb[1]:numeric , sigma[1]:numeric \
@@ -3343,19 +3434,17 @@ begin
 
    if (iounit(0).eq.0) then                               ; degC
        pet = thornthwaite(t, lat, False, dim)
-   else if (iounit(0).eq.1) then                          ; degK
+   elseif (iounit(0).eq.1) then                          ; degK
        pet = thornthwaite((t-273.16), lat, False, dim)
-   else if (iounit(0).eq.2) then                          ; F
+   elseif (iounit(0).eq.2) then                          ; F
        pet = thornthwaite(((t-32)*0.5555556), lat, False, dim)
-   end if        ; F
-   end if        ; K 
-   end if        ; C  
+   end if
 
    pet@long_name = "PET: Thornthwaite"
 
    if (iounit(1).eq.0) then     
         pet@units = "mm/month"
-   else if (iounit(1).eq.1) then
+   elseif (iounit(1).eq.1) then
         dymo      = (/31,28,31,30,31,30,31,31,30,31,30,31/)
         dimt      = dimsizes(t)
         ntim      = dimt(dim)
@@ -3365,12 +3454,10 @@ begin
         end do
         pet       = pet/conform(t,DYMO,dim)
         pet@units = "mm/day"
-   else if (iounit(1).eq.2) then
+   elseif (iounit(1).eq.2) then
         pet       = pet*0.03937008
         pet@units = "inches/month"
-   end if        ; mm/month
-   end if        ; mm/day
-   end if        ; inches/month
+   end if
 
    copy_VarCoords(t, pet)
    return(pet)
@@ -3965,7 +4052,7 @@ end
 ; ******************************************************************
 undef("pie_chart")
 function pie_chart(wks:graphic, percent[*]:numeric, name[*]:string        \
-                              , colors[*]:string, pieChartRes:logical)
+                              , colors, pieChartRes:logical)
 ;                    Create a Pie Chart
 ; Nomenclature
 ;      percent     - percent [%: 0-100] for each section: sum(percent)=100
@@ -3981,6 +4068,8 @@ function pie_chart(wks:graphic, percent[*]:numeric, name[*]:string        \
 ;                    pieChartRes@pcLabelType = "section"   [default]
 ;                    pieChartRes@pcLabelType = "block"  [labels beneath chart]
  begin
+  rgba_colors = convert_color_to_rgba(wks,colors)
+
   rad       = 4.*atan(1.0)/180.                ; degress to radians
   nSections = dimsizes(percent) 
                                                ; Specify limits for X and Y axes.
@@ -4080,11 +4169,11 @@ function pie_chart(wks:graphic, percent[*]:numeric, name[*]:string        \
      xx(npts2-1)   = xOrig
      yy(npts2-1)   = yOrig
 
-     pgRes@gsFillColor   =  colors(n)          ; fill with associated color
+     pgRes@gsFillColor   =  colors(n,:)          ; fill with associated color
      plotPC@$unique_string("dum")$ = gsn_add_polygon (wks, plotPC, xx, yy, pgRes)  ; color fill
      plotPC@$unique_string("dum")$ = gsn_add_polyline(wks, plotPC, xx, yy, plRes)  ; outline
 
-     gsRes@gsMarkerColor = colors(n)           ; associate marker
+     gsRes@gsMarkerColor = colors(n,:)           ; associate marker
      if (percent(n).lt.10) then
          text = sprintf("%5.1f", percent(n))+"  "+name(n)  ; include %
      else
@@ -4114,7 +4203,7 @@ function pie_chart(wks:graphic, percent[*]:numeric, name[*]:string        \
      xxInfo = (circ+0.25*extraSpace)*cos(((pcStrt+pcLast)*0.5+phase)*rad)
      yyInfo = (circ+0.25*extraSpace)*sin(((pcStrt+pcLast)*0.5+phase)*rad)
      angle  = atan2(xxInfo,yyInfo)/rad
-    ;print("n="+n+"   angle="+angle+"   "+colors(n))
+    ;print("n="+n+"   angle="+angle+"   "+colors(n,:))
      ix     = 5   
      if (angle.gt.-0.001) then                 ; round
          txRes@txJust  = "CenterLeft"
@@ -4610,12 +4699,11 @@ begin
   var_rank = dimsizes(dimsizes(var_eta))
   if (var_rank.eq.4) then         ;  (Time, bottom_top, south_north, west_east) => (0,1,2,3)
       var_iso = int2p_n_Wrap (prs_eta,var_eta,prs_iso,linlog,1)
-  else if (var_rank.eq.3) then    ;  (bottom_top, south_north, west_east)       => (0,1,2)
-           var_iso = int2p_n_Wrap (prs_eta,var_eta,prs_iso,linlog,0)
-       else
-           print("eta2isop_wrf: unexpected rank; rank="+var_rank+"; code expects rank=3 or 4 only")
-           exit
-       end if 
+  elseif (var_rank.eq.3) then    ;  (bottom_top, south_north, west_east)       => (0,1,2)
+      var_iso = int2p_n_Wrap (prs_eta,var_eta,prs_iso,linlog,0)
+  else
+      print("eta2isop_wrf: unexpected rank; rank="+var_rank+"; code expects rank=3 or 4 only")
+      exit
   end if
 
   var_iso@tag = "NCL: Simple interpolation to isobaric levels via int2p_n_Wrap"
@@ -4940,11 +5028,26 @@ end
 ;; Adam Phillips
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 undef("simple_legend") 
-function simple_legend(wksp:graphic,xyplot:graphic,genres:logical,lineres:logical,labelres:logical)
+function simple_legend(wksp:graphic,xyplot:graphic,genres_orig:logical,\
+                       lineres_orig:logical,labelres_orig:logical)
 local wksp,xyplot,genres,lineres,labelres,XPos,YPos,numitems,xrange,yrange,incr,y_pos,x_line_start,\
-      x_line_end,x_text_start,x_text_end
+      x_line_end,x_text_start,x_text_end,genres,lineres,labelres
 
 begin
+;---Make copies of these so we don't change original resource lists.
+  genres   = genres_orig
+  lineres  = lineres_orig
+  labelres = labelres_orig
+
+  if (isatt(labelres,"lgLabels")) then
+     numItems = dimsizes(labelres@lgLabels)
+  else
+     print("simple_legend: Fatal: Legend labels must be set using lgLabels.")
+     print("  If empty labels are required, set lgLabels resource to an empty")
+     print("  string array dimensioned equal to the number of legend lines.")
+     exit
+  end if
+
   getvalues xyplot
     "trYMinF" : ymin
     "trYMaxF" : ymax
@@ -4954,8 +5057,135 @@ begin
   yrange = ymax - ymin
   xrange = xmax - xmin
 
+;---Set some defaults
+  genres@ItemSpacePercent           = get_res_value_keep(genres,"ItemSpacePercent",5.)
+  genres@Position                   = get_res_value_keep(genres,"Position","Top")
+  genres@XPosPercent                = get_res_value_keep(genres,"XPosPercent",5.)
+  genres@LineLabelWhiteSpacePercent = get_res_value_keep(genres,"LineLabelWhiteSpacePercent",3.)
+  lineres@LineLengthPercent         = get_res_value_keep(lineres,"LineLengthPercent",7.)
+
+  incr = (genres@ItemSpacePercent/100.)*yrange*-1.
+  XPos = genres@XPosPercent/100.
+
+  if (isatt(genres,"YPosPercent")) then
+     YPos = genres@YPosPercent/100.
+     if (str_lower(genres@Position).eq."bottom") then  ; modify YPosPercent when doing bottom label so that first label is on top
+        YPos = YPos+((numItems-1)*(genres@ItemSpacePercent/100.))
+     end if
+  else
+     if (str_lower(genres@Position).eq."bottom") then
+        YPos = 0.05   ; set default
+     else
+        YPos = 0.95   ; set default
+     end if
+  end if
+
+  txres = True
+  txres@txJust = "CenterLeft"
+  txres@txFontHeightF = 0.015
+
+  zres = True
+  polyres = True
+  do gg = 0,numItems-1
+     if (gg.eq.0) then
+        y_pos = (YPos*yrange)+ymin
+     else
+        y_pos = y_pos+incr
+     end if
+     x_line_start = xmin+(XPos*xrange)   ; position of start of legend line
+     x_line_end   = x_line_start+(xrange*(lineres@LineLengthPercent/100.))
+     x_text_start = x_line_end+(xrange*(genres@LineLabelWhiteSpacePercent/100.))
+     if (isatt(lineres,"lgLineColors")) then
+       colors = convert_color_to_rgba(wksp,lineres@lgLineColors)
+       if (dimsizes(colors(:,0)).eq.1.or.\
+           dimsizes(colors(:,0)).ne.dimsizes(labelres@lgLabels)) then
+         zres@gsLineColor = colors(0,:)
+       else
+         zres@gsLineColor = colors(gg,:)
+       end if
+     end if
+
+     if (isatt(lineres,"lgLineOpacity")) then
+        if (dimsizes(lineres@lgLineOpacity).eq.1.or.dimsizes(lineres@lgLineOpacity).ne.dimsizes(labelres@lgLabels)) then
+           zres@gsLineOpacityF = lineres@lgLineOpacity(0)
+        else
+           zres@gsLineOpacityF = lineres@lgLineOpacity(gg) 
+        end if
+     end if    
+     if (isatt(lineres,"lgLineThicknesses")) then 
+        if (dimsizes(lineres@lgLineThicknesses).eq.1.or.dimsizes(lineres@lgLineThicknesses).ne.dimsizes(labelres@lgLabels)) then
+           zres@gsLineThicknessF = lineres@lgLineThicknesses(0)
+        else
+           zres@gsLineThicknessF = lineres@lgLineThicknesses(gg)
+        end if
+     end if
+     if (isatt(lineres,"lgDashIndexes")) then 
+        if (dimsizes(lineres@lgDashIndexes).eq.1.or.dimsizes(lineres@lgDashIndexes).ne.dimsizes(labelres@lgLabels)) then
+           zres@gsLineDashPattern = lineres@lgDashIndexes(0)
+        else
+           zres@gsLineDashPattern = lineres@lgDashIndexes(gg)
+        end if
+     else
+        zres@gsLineDashPattern = 0
+     end if 
+     xyplot@$unique_string("lg")$ = gsn_add_polyline(wksp,xyplot,(/x_line_start,x_line_end/),(/y_pos,y_pos/),zres)
+
+     if (isatt(labelres,"lgLabelFontHeights")) then
+        if (dimsizes(labelres@lgLabelFontHeights).eq.1.or.dimsizes(labelres@lgLabelFontHeights).ne.dimsizes(labelres@lgLabels)) then
+           txres@txFontHeightF = labelres@lgLabelFontHeights(0)
+        else
+           txres@txFontHeightF = labelres@lgLabelFontHeights(gg)
+        end if
+     end if
+     if (isatt(labelres,"lgLabelColors")) then
+        colors := convert_color_to_rgba(wksp,labelres@lgLabelColors)
+        if (dimsizes(colors(:,0)).eq.1.or.dimsizes(colors(:,0)).ne.dimsizes(labelres@lgLabels)) then
+           txres@txFontColor = colors(0,:)
+        else
+           txres@txFontColor = colors(gg,:)
+        end if
+     end if
+     if (isatt(labelres,"lgLabelOpacity")) then
+        if (dimsizes(labelres@lgLabelOpacity).eq.1.or.dimsizes(labelres@lgLabelOpacity).ne.dimsizes(labelres@lgLabels)) then
+           txres@txFontOpacityF = labelres@lgLabelOpacity(0)
+        else
+            txres@txFontOpacityF = labelres@lgLabelOpacity(gg)
+        end if
+     end if
+     xyplot@$unique_string("lg")$ = gsn_add_text(wksp,xyplot,labelres@lgLabels(gg),x_text_start,y_pos,txres)
+  end do
+  return(xyplot)
+end
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Description: Create a legend using calls to gsn_polyline_ndc/gsn_text_ndc
+;; to draw legend anywhere within the NDC space on a page. Resources are used
+;; to set the position of upper-left corner of the legend, the legend labels,
+;; the spacing of the legend items, and the appearance of
+;; the lines and labels.
+;; Adam Phillips, added in NCL V6.5.0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+undef("simple_legend_ndc")
+procedure simple_legend_ndc(wksp:graphic,genres_orig:logical,lineres_orig:logical,labelres_orig:logical)
+local wksp,genres,lineres,labelres,XPos,YPos,numitems,xrange,yrange,incr,y_pos,x_line_start,\
+      x_line_end,x_text_start,x_text_end,colors
+
+begin
+;---Make copies of these so we don't change original resource lists.
+  genres   = genres_orig
+  lineres  = lineres_orig
+  labelres = labelres_orig
+
+  ymin = 0.0
+  ymax = 1.0
+  xmin = 0.0
+  xmax = 1.0
+  yrange = ymax - ymin
+  xrange = xmax - xmin
+
   if (.not.isatt(genres,"ItemSpacePercent")) then
-     genres@ItemSpacePercent = 5.
+     genres@ItemSpacePercent = 2.5
   end if
   incr = (genres@ItemSpacePercent/100.)*yrange*-1.
 
@@ -4966,7 +5196,7 @@ begin
   if (isatt(labelres,"lgLabels")) then
      numItems = dimsizes(labelres@lgLabels)
   else
-     print("simple_legend: Fatal: Legend labels must be set using lgLabels. If empty labels are required set lgLabels resource to an empty string array dimenensioned equal to the number of legend lines.")
+     print("simple_legend_ndc Fatal: Legend labels must be set using lgLabels. If empty labels are required set lgLabels resource to an empty string array dimenensioned equal to the number of legend lines.")
      exit
   end if
 
@@ -5013,28 +5243,31 @@ begin
      else
         x_text_start = x_line_end+(xrange*0.03)    ; set default
      end if
+
      if (isatt(lineres,"lgLineColors")) then
-        if (dimsizes(lineres@lgLineColors).eq.1.or.dimsizes(lineres@lgLineColors).ne.dimsizes(labelres@lgLabels)) then
-           zres@gsLineColor = lineres@lgLineColors(0)
-        else
-           zres@gsLineColor = lineres@lgLineColors(gg)
-        end if
+       colors = convert_color_to_rgba(wksp,lineres@lgLineColors)
+       if (dimsizes(colors(:,0)).eq.1.or.\
+           dimsizes(colors(:,0)).ne.dimsizes(labelres@lgLabels)) then
+         zres@gsLineColor = colors(0,:)
+       else
+         zres@gsLineColor = colors(gg,:)
+       end if
      end if
      if (isatt(lineres,"lgLineOpacity")) then
         if (dimsizes(lineres@lgLineOpacity).eq.1.or.dimsizes(lineres@lgLineOpacity).ne.dimsizes(labelres@lgLabels)) then
            zres@gsLineOpacityF = lineres@lgLineOpacity(0)
         else
-           zres@gsLineOpacityF = lineres@lgLineOpacity(gg) 
+           zres@gsLineOpacityF = lineres@lgLineOpacity(gg)
         end if
-     end if    
-     if (isatt(lineres,"lgLineThicknesses")) then 
+     end if
+     if (isatt(lineres,"lgLineThicknesses")) then
         if (dimsizes(lineres@lgLineThicknesses).eq.1.or.dimsizes(lineres@lgLineThicknesses).ne.dimsizes(labelres@lgLabels)) then
            zres@gsLineThicknessF = lineres@lgLineThicknesses(0)
         else
            zres@gsLineThicknessF = lineres@lgLineThicknesses(gg)
         end if
      end if
-     if (isatt(lineres,"lgDashIndexes")) then 
+     if (isatt(lineres,"lgDashIndexes")) then
         if (dimsizes(lineres@lgDashIndexes).eq.1.or.dimsizes(lineres@lgDashIndexes).ne.dimsizes(labelres@lgLabels)) then
            zres@gsLineDashPattern = lineres@lgDashIndexes(0)
         else
@@ -5042,8 +5275,8 @@ begin
         end if
      else
         zres@gsLineDashPattern = 0
-     end if 
-     xyplot@$unique_string("lg")$ = gsn_add_polyline(wksp,xyplot,(/x_line_start,x_line_end/),(/y_pos,y_pos/),zres)
+     end if
+     gsn_polyline_ndc(wksp,(/x_line_start,x_line_end/),(/y_pos,y_pos/),zres)
 
      if (isatt(labelres,"lgLabelFontHeights")) then
         if (dimsizes(labelres@lgLabelFontHeights).eq.1.or.dimsizes(labelres@lgLabelFontHeights).ne.dimsizes(labelres@lgLabels)) then
@@ -5053,10 +5286,11 @@ begin
         end if
      end if
      if (isatt(labelres,"lgLabelColors")) then
-        if (dimsizes(labelres@lgLabelColors).eq.1.or.dimsizes(labelres@lgLabelColors).ne.dimsizes(labelres@lgLabels)) then
-           txres@txFontColor = labelres@lgLabelColors(0)
+        colors := convert_color_to_rgba(wksp,labelres@lgLabelColors)
+        if (dimsizes(colors(:,0)).eq.1.or.dimsizes(colors(:,0)).ne.dimsizes(labelres@lgLabels)) then
+           txres@txFontColor = colors(0,:)
         else
-           txres@txFontColor = labelres@lgLabelColors(gg)
+           txres@txFontColor = colors(gg,:)
         end if
      end if
      if (isatt(labelres,"lgLabelOpacity")) then
@@ -5066,8 +5300,847 @@ begin
             txres@txFontOpacityF = labelres@lgLabelOpacity(gg)
         end if
      end if
-     xyplot@$unique_string("lg")$ = gsn_add_text(wksp,xyplot,labelres@lgLabels(gg),x_text_start,y_pos,txres)
+     gsn_text_ndc(wksp,labelres@lgLabels(gg),x_text_start,y_pos,txres)
   end do
-  return(xyplot)
 end
 
+;-------------------------------------------------------------------------------
+; Library of 'hybrid' related  functions
+;
+; Most of these are interfaces to the built-in pres_hybrid_ccm & dpres_hybrid_ccm functions.
+;
+; They change the input to match the 'ccm' method.
+;
+; _ecmwf -> HYA(p)    + HB(p)*ps       where HYA(p) = A(p)*p0 
+; _sb81  -> complicated for actual conserving pressure values
+;
+; _ccm   -> hyai(p)*p0  + hybi(p)*ps    
+; _ccm   -> HA(p)*p0    + HB(p)*ps    
+;
+; The *_reference_* functions create a 'reference' or 'nominal' vertical coordinate variable. 
+; This is created by setting the surface pressure (ps) equal to the reference pressure: ps=p0.
+; Thvertical corrdinate variable is analogous to the 'lev' coordinate variable on CECM-CAM files.
+; Really, it is just a placeholder.
+;------------------------------------------------------------------------------
+undef("pres_hybrid_reference_sb81")
+function pres_hybrid_reference_sb81(ps:numeric, p0[1]:numeric, hyai[*]:numeric, hybi[*]:numeric)
+;*********************
+;   NOT FULLY TESTED
+;*********************
+;
+; This function creates a reference (nominal) coordinate variable for the SB81 formulation..
+; The reference pressure, p0, is 100000 (Pa) or 1000 (hPa)
+;
+; This is an interface to NCL function  'pres_hybrid_jra55'
+; See function "pres_hybrid_sb81" for more documentation.
+;
+; Nomenclature:
+;   ps - surface pressure: (lat,lon), (time,lat,lon), (ncase,time,lat,lon)
+;   p0 - reference surface pressure: 1000 if ps units are hPa; 100000 if ps units are Pa
+;   hyai, hybi - hybrid interface coefficients
+; ----------------------------------------------------------------
+;
+local pbase, bot2top, pnom, pref, pName
+begin
+
+;---pres_hybrid_jra55 requires  at least 2D [historical reason]
+  pbase = new((/1,1/), typeof(ps), "No_FillValue")
+  pbase = p0
+
+;---Check vertical order: pres_hybrid_jra55 requires bottom-to-top (near surface to top)
+  if (hybi(0).le.hybi(1)) then
+      bot2top = False      ; data ordered top-to-bottom. Must reverse order.
+      pnom    = pres_hybrid_jra55(pbase,hyai(::-1),hybi(::-1)) ; nominal pres level
+  else
+      bot2top = True
+      pnom    = pres_hybrid_jra55(pbase,hyai,hybi)             ; nominal pres level
+  end if
+
+;---Create reference (nominal) pressure coordinate variable
+  pName  = "pref"
+  pref   = pnom(:,0,0)
+  pref!0 = pName
+  pref@long_name = "reference (nominal) pressure level: p0="+p0
+  if (isatt(ps,"units")) then
+      pref@units = ps@units
+  end if
+  pref&$pName$   = pref
+
+  pref@long_name  = "reference (nominal) pressure levels"
+  if (isatt(ps,"units")) then
+      pref@units = ps@units
+  end if
+
+  if (.not.bot2top) then
+      pref = pref(::-1)
+  end if
+
+  return(pref)
+end
+;-------------------------------------------------------------------
+undef("pres_hybrid_sb81")
+function pres_hybrid_sb81(ps:numeric, p0[1]:numeric,  hyai[*]:numeric, hybi[*]:numeric)
+;*********************
+;   NOT FULLY TESTED
+;*********************
+;
+; This is an interface to NCL function  'pres_hybrid_jra55'
+; The 'pres_hybrid_jra55' function implements the Simmons and Burridge (1981) 
+; hybrid pressure formulation.
+;
+; If necessary this function will reorder the vertical hybrid coefficients
+; so they can be input to NCL's pres_hybrid_jra55 function. As a value-added
+; feature, it will also associate a reference level coordinate variable.
+;
+; Nomenclature:
+;   ps - surface pressure: (lat,lon), (time,lat,lon), (ncase,time,lat,lon)
+;   p0 - reference surface pressure: 1000 if ps units are hPa; 100000 if ps units are Pa 
+;   hyai, hybi - hybrid interface coefficients
+;
+; Reference:
+;   Simmons. A.J., and D. M. Burridge:
+;   An Energy and Angular-Momentum Conserving Vertical Finite-Difference Scheme 
+;      and Hybrid Vertical Coordinates 
+;   MON WEATHER REV , vol. 109, no. 4, 1981
+;   http://dx.doi.org/10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2
+;   See equations (17) and (18)
+;
+; sb81 - Simmons and Burridge (1981)
+; ----------------------------------------------------------------
+; The pres_hybrid_jra55 implements the sb81 equations (17) and (18).
+; However, at this time,  pres_hybrid_jra55 requires data ordered 
+; *bottom-to-top* of atmosphere.
+;
+; Nominally, the Simmons/Burridge formula is:
+;
+;    p(k) = exp( (1/dp(k))*(p(k-0.5)*log(p(k-0.5)) - p(k+0.5)*log(p(k+0.5))-1.0))
+;
+; where the p(k-05) and p(k+0.5) represent the interface coefficients. 
+; ----------------------------------------------------------------
+;
+local dim_ps, rank_ps, pbase, bot2top, pres, pnom, pref, pName
+begin
+  dim_ps  = dimsizes(ps)
+  rank_ps = dimsizes(dim_ps)
+  if (rank_ps.eq.1) then
+      print("pres_hybrid_sb81: Currently this function does not allow one-dim arrays")
+      exit
+  end if
+
+;---pres_hybrid_jra55 requires  at least 2D [historical reason]
+  pbase = new((/1,1/), typeof(ps), "No_FillValue")
+  pbase = p0       
+
+;---Check vertical order: pres_hybrid_jra55 requires bottom-to-top (near surface to top)
+  if (hybi(0).le.hybi(1)) then
+      bot2top = False      ; data ordered top-to-bottom. Must reverse order.
+      pres    = pres_hybrid_jra55(ps   ,hyai(::-1),hybi(::-1)) 
+      pnom    = pres_hybrid_jra55(pbase,hyai(::-1),hybi(::-1)) ; nominal pres level
+  else
+      bot2top = True
+      pres    = pres_hybrid_jra55(ps   ,hyai, hybi) 
+      pnom    = pres_hybrid_jra55(pbase,hyai,hybi)             ; nominal pres level
+  end if
+
+;---Create reference (nominal) pressure coordinate variable
+  pName  = "pref"
+  pref   = pnom(:,0,0)
+  pref!0 = pName
+  pref@long_name = "reference (nominal) pressure level: p0="+p0
+  if (isatt(ps,"units")) then
+      pref@units = ps@units
+  end if
+  pref&$pName$   = pref
+
+;---Add meta data; if necessary, reverse vertical order to match the source
+  if (rank_ps.eq.3) then
+      copy_VarCoords(ps, pres(:,0,:,:))       
+      pres!1 = pName
+      pres&$pName$ = pref
+      if (.not.bot2top) then
+          pres   = pres(:,::-1,:,:)
+      end if
+  else if (rank_ps.eq.2) then                     ; (lat,lon)
+           copy_VarCoords(ps, pres(0,:,:))       
+           pres!0 = pName
+           pres&$pName$ = pref
+           if (.not.bot2top) then
+               pres = pres(::-1,:,:)
+           end if
+  else if (rank_ps.eq.4) then                     ; (ncase,time,lat,lon)
+           copy_VarCoords(ps, pres(:,:,0,:,:))       
+           pres!2 = pName
+           pres&$pName$ = pref
+           if (.not.bot2top) then
+               pres = pres(:,:,::-1,:,:)
+           end if
+    end if     ; 4 
+   end if      ; 2
+  end if       ; 3
+
+
+  pres@long_name  = "pressure"
+  if (isatt(ps,"units")) then
+      pres@units = ps@units
+  end if
+
+  return(pres)
+end
+;--------------------------
+undef("pres_hybrid_reference_ecmwf")
+function pres_hybrid_reference_ecmwf(ps:numeric, p0[1]:numeric, am[*]:numeric, bm[*]:numeric)
+;*********************
+;   NOT FULLY TESTED
+;*********************
+;
+; For historical reason: the _ecmwf refers to the ECMWF formulation for hybrid pressure values
+;
+; pref = A(p) +hyb(p)*p0    ; where A(p)=hya(p)*p0  
+;      = am   + bm*p0
+;
+; Nomenclature:
+;   ps - surface pressure: (lat,lon), (time,lat,lon), (ncase,time,lat,lon)
+;   p0 - reference surface pressure: 1000 if ps units are hPa; 100000 if ps units are Pa 
+;   am, bm - hybrid mid-level coefficients
+
+local pName, pref
+begin
+   pref   = am + bm*p0
+   pref@long_name  = "reference (nominal) pressure levels"
+   if (isatt(ps,"units")) then
+       pref@units = ps@units
+   end if
+   pName        = getvardims(am)
+   pref!0       = pName                    
+   pref&$pName$ = pref                   
+   return(pref)
+end
+;--------------------------
+undef("pres_hybrid_ecmwf")
+function pres_hybrid_ecmwf(ps:numeric, p0:numeric, am[*]:numeric, bm[*]:numeric)
+;*********************
+;   NOT FULLY TESTED
+;*********************
+;
+; For historical reason: the _ecmwf refers to the ECMWF formulation for hybrid pressure values
+;
+; pres = A(p) +B(p)*PSFC    ; where A(p) = hya(p)*p0
+;      = am   + bm*ps
+;
+; Nomenclature:
+;   ps - surface pressure: (lat,lon), (time,lat,lon), (ncase,time,lat,lon)
+;   p0 - reference surface pressure: 1000 if ps units are hPa; 100000 if ps units are Pa 
+;   am - hybrid 'A'  mid-level coef of the form: am = hya(:)*p0
+;   bm - hybrid 'B'  mid-level coef: same as CCM hybrid 'B' coefficient
+;
+local hyam, pres, plev, pName, dim_ps, rank_ps
+begin
+   dim_ps  = dimsizes(ps)
+   rank_ps = dimsizes(dim_ps)
+   if (rank_ps.eq.1) then
+       print("pres_hybrid_ecmwf: Currently this function does not allow one-dim arrays")
+       exit
+   end if
+
+   hyam  = am/p0                          ; convert to that expected by pres_hybrid_ccm
+ ;;hybm  = bm                             ; same
+
+                                          ; use 'classic' pres_hybrid_ccm function
+   pres  = pres_hybrid_ccm(ps, p0, hyam, bm)  
+  ;pName = "prefm"
+   pName = getvardims(am)                 ; original dimension name
+
+   pref  = pres_hybrid_reference_ecmwf(ps, p0, am, bm)
+   pref!0= pName
+   pref&$pName$ = pref
+
+   if (rank_ps.eq.3) then
+       copy_VarCoords(ps, pres(:,0,:,:))       
+       pres!1 = pName
+   else if (rank_ps.eq.2) then
+            copy_VarCoords(ps, pres(0,:,:))       
+            pres!0 = pName
+   else if (rank_ps.eq.4) then
+            copy_VarCoords(ps, pres(:,:,0,:,:))       
+            pres!2 = pName
+   end if   
+   end if 
+   end if 
+   pres&$pName$ = pref
+
+   pres@long_name  = "pressure"
+   pres@units      = ps@units
+
+   return(pres)
+end
+;--------------------------
+undef("dpres_hybrid_ecmwf")
+function dpres_hybrid_ecmwf(ps:numeric, p0[1]:numeric, ai[*]:numeric, bi[*]:numeric)
+local dim_ps, rank_ps, hyai,  dpres
+begin
+  dim_ps  = dimsizes(ps)
+  rank_ps = dimsizes(dim_ps)
+  if (rank_ps.eq.1) then
+      print("dpres_hybrid_ecmwf: Currently this function does not allow one-dim arrays")
+      exit
+  end if
+
+;---Use classic dpres_hybrid_ccm functiom
+  hyai   = ai/p0                          ; convert to that expected by dpres_hybrid_ccm
+;;hybi   = bi                             ; same
+  dpres  = dpres_hybrid_ccm(ps, p0, hyai, bi)  ; use 'classic' pres_hybrid_ccm function
+
+  mlvl  = dimsizes(hyai)
+  am    = (  ai(0:mlvl-2)+  ai(1:mlvl-1))*0.5  ; ECMWF 'a' coef
+  bm    = (  bi(0:mlvl-2)+  bi(1:mlvl-1))*0.5
+  pref  = pres_hybrid_reference_ecmwf(ps, p0, am, bm)
+
+  pName = getvardims(pref)
+
+;---Add horizontal spatial and temporal  meta data
+  if (rank_ps.eq.3) then
+      copy_VarCoords(ps, dpres(:,0,:,:))
+      dpres!1 = pName
+      else if (rank_ps.eq.2) then
+            copy_VarCoords(ps, dpres(0,:,:))
+            dpres!0 = pName
+      else if (rank_ps.eq.4) then
+            copy_VarCoords(ps, pres(:,:,0,:,:))
+            dpres!2 = pName
+      end if   ; 4
+    end if     ; 2
+   end if      ; 3
+   dpres&$pName$ = pref
+
+  dpres@long_name  = "pressure layer thickness"
+  if (isatt(ps,"units")) then
+      dpres@units = ps@units
+  end if
+
+  return(dpres)
+end
+;--------------------------
+undef("dpres_hybrid_sb81")
+function dpres_hybrid_sb81(ps:numeric, p0[1]:numeric, ai[*]:numeric, bi[*]:numeric)
+local dim_ps, rank_ps, hyai,  dpres
+begin
+  dim_ps  = dimsizes(ps)
+  rank_ps = dimsizes(dim_ps)
+  if (rank_ps.eq.1) then
+      print("dpres_hybrid_sb81_v0: Currently this function does not allow one-dim arrays")
+      exit
+  end if
+
+  if (bi(0).le.bi(1)) then
+      bot2top = False      ; data ordered top-to-bottom. Must reverse order.
+  else
+      bot2top = True
+  end if
+
+;---Use classic dpres_hybrid_ccm functiom
+  hyai   = ai/p0                          ; convert to that expected by dpres_hybrid_ccm
+;;hybi   = bi                             ; same
+  dpres  = dpres_hybrid_ccm(ps, p0, hyai, bi)  ; use 'classic' pres_hybrid_ccm function
+
+;---Create vertical meta data; associate the conservative values
+   pref  = pres_hybrid_reference_sb81(ps, p0, hyai, bi)
+printVarSummary(pref)
+
+   pName = getvardims(pref)
+
+;---Add horizontal spatial and temporal  meta data
+  if (rank_ps.eq.3) then
+      copy_VarCoords(ps, dpres(:,0,:,:))
+      dpres!1 = pName
+      else if (rank_ps.eq.2) then
+            copy_VarCoords(ps, dpres(0,:,:))
+            dpres!0 = pName
+      else if (rank_ps.eq.4) then
+            copy_VarCoords(ps, pres(:,:,0,:,:))
+            dpres!2 = pName
+      end if   ; 4
+    end if     ; 2
+   end if      ; 3
+   dpres&$pName$ = pref
+
+  dpres@long_name  = "pressure layer thickness"
+  if (isatt(ps,"units")) then
+      dpres@units = ps@units
+  end if
+
+  return(dpres)
+end
+;----------------------------------------------------------------------------
+; array padding
+;----------------------------------------------------------------------------
+undef("dim_pad_extend")
+function dim_pad_extend(x:numeric, Next[1]:integer,  ndim[1]:integer, opt[1]:logical)   
+
+; Pad (extend) the 'size' of the user specified dimension to  size 'N'
+; Only 'ndim' 0 or 1 is supported.
+; 
+; Coordinate values (if any) along 'dims' dimension are lost.
+; A created dimension name will be given to the expanded dimension.  
+;
+local dimx, ntim, N, rankx, NTIM, X, DNAM
+begin
+  if (ndim.gt.1) then
+      print("dim_pad_extend: ndim>1 is not supported: ndim="+ndim)
+      exit
+  end if
+
+  dimx  = dimsizes(x)
+  rankx = dimsizes(dimx)
+  ntim  = dimx(ndim) 
+  NTIM  = ntim + Next
+
+  dimx(ndim) = NTIM
+  X    = new( dimx, typeof(x), getVarFillValue(x))
+  copy_VarAtts(x,X)
+
+  if (rankx.eq.1) then
+      if (ndim.ne.0) then
+          print("dim_pad_extend: For a rank-one array ndim must be 0: ndim="+ndim)
+          exit
+      end if
+      X(0:ntim-1)     = (/ x /) 
+  elseif (rankx.eq.2) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:)   = (/ x /)
+          copy_VarCoords(x(0,:), X(0,:))
+      else
+          X(:,0:ntim-1)   = (/ x /)
+          copy_VarCoords(x(:,0), X(:,0))
+      end if
+  elseif (rankx.eq.3) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:), X(0,:,:))
+      else
+          X(:,0:ntim-1,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:), X(:,0,:))
+      end if
+  elseif (rankx.eq.4) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:,:), X(0,:,:,:))
+      else
+          X(:,0:ntim-1,:,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:,:), X(:,0,:,:))
+      end if
+  elseif (rankx.eq.5) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:,:,:), X(0,:,:,:,:))
+      else
+          X(:,0:ntim-1,:,:,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:,:,:), X(:,0,:,:,:))
+      end if
+  end if
+
+  DNAM   = "extend_"+Next
+  if (isdimnamed(x,ndim)) then 
+      DNAM   = x!ndim +"_"+DNAM  
+  end if
+  X!ndim     = DNAM
+  X@Next     = Next
+
+  return(X)
+end
+;======================================================
+undef("dim_pad_modulo")
+function dim_pad_modulo(x:numeric, Nmod[1]:integer,  ndim[1]:integer, opt[1]:logical)   
+;
+; This is useful for functions 
+; Pad (expand) the 'size' of the user specified dimension to get a 'SIZE' such that (SIZE % N)=0 
+; Only 'ndim' 0 or 1 is supported.
+; 
+; Coordinate values (if any) along 'ndim' dimension are lost.
+; A created dimension name will be given to the expanded dimension.  
+;
+local dimx, ntim, rankx, NTIM, X, DNAM
+begin
+  if (ndim.gt.1) then
+      print("dim_pad_modulo: ndim>1 is not supported: ndim="+ndim)
+      exit
+  end if
+
+  dimx  = dimsizes(x)
+  rankx = dimsizes(dimx)
+  ntim  = dimx(ndim)      ; usually the time dimension
+  
+  if (ntim%Nmod.eq.0) then
+      return(x)
+  end if
+
+  if (ntim.lt.Nmod) then
+      NTIM = Nmod
+  else
+      NTIM = (ntim/Nmod)*Nmod + Nmod
+  end if
+
+  dimx(ndim) = NTIM
+  X    = new( dimx, typeof(x), getVarFillValue(x))
+  copy_VarAtts(x,X)
+
+  if (rankx.eq.1) then
+      if (ndim.ne.0) then
+          print("dim_pad_modulo: For a rank-one array ndim must be 0: ndim="+ndim)
+          exit
+      end if
+      X(0:ntim-1)     = (/ x /) 
+  elseif (rankx.eq.2) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:)   = (/ x /)
+          copy_VarCoords(x(0,:), X(0,:))
+      else
+          X(:,0:ntim-1)   = (/ x /)
+          copy_VarCoords(x(:,0), X(:,0))
+      end if
+  elseif (rankx.eq.3) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:), X(0,:,:))
+      else
+          X(:,0:ntim-1,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:), X(:,0,:))
+      end if
+  elseif (rankx.eq.4) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:,:), X(0,:,:,:))
+      else
+          X(:,0:ntim-1,:,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:,:), X(:,0,:,:))
+      end if
+  elseif (rankx.eq.5) then
+      if (ndim.eq.0) then
+          X(0:ntim-1,:,:,:,:)   = (/ x /)
+          copy_VarCoords(x(0,:,:,:,:), X(0,:,:,:,:))
+      else
+          X(:,0:ntim-1,:,:,:)   = (/ x /)
+          copy_VarCoords(x(:,0,:,:,:), X(:,0,:,:,:))
+      end if
+  end if
+
+  DNAM   = "modulo_"+Nmod
+  if (isdimnamed(x,ndim)) then 
+      DNAM   = x!ndim +"_"+DNAM  
+  end if
+  X!ndim     = DNAM
+  X@Nmod     = Nmod
+
+  return(X)
+end
+;----------------------------------------------------------------------------
+;----------------------- Unsupported: DJS -----------------------------------
+;----------------------------------------------------------------------------
+; Calculate the "joint PDF" of arrays "x", "y" and "z"
+;----------------------------------------------------------------------------
+undef("PDFXYZ")
+function PDFXYZ(x:numeric, y:numeric, z:numeric \
+               ,nbinx[1]:integer, nbiny[1]:integer, nbinz[1]:integer, opt:logical)
+local nGood_x, nbinsx, xMin, xMax, xSpacet, binx, binxBound, binxCenter, nbx \
+     ,nGood_y, nbinsy, yMin, yMax, ySpace , biny, binyBound, binyCenter, nby \
+     ,nGood_z, nbinsz, zMin, zMax, zSpace , binz, binzBound, binzCenter, nbz \
+     ,outside, mnmxint,pdf3, nTot, nTOT   , dbinx,    dbiny, dbinz
+begin
+
+  if (nbinx.le.2) then
+      nbinsx = 25             ; default
+  else
+      nbinsx = nbinx
+  end if
+
+  if (nbiny.le.2) then
+      nbinsy = 25             ; default
+  else
+      nbinsy = nbiny
+  end if
+
+  if (nbinz.le.2) then
+      nbinsz = 25             ; default
+  else
+      nbinsz = nbinz
+  end if
+
+  nGood_x = num(.not.ismissing(x))
+  if (nGood_x.lt.3) then
+      print("PDFXYZ: nGood(x)="+nGood_x+" : Need more non-missing points")
+  end if
+
+  nGood_y = num(.not.ismissing(y))
+  if (nGood_y.lt.3) then
+      print("PDFXYZ: nGood(y)="+nGood_y+" : Need more non-missing points")
+  end if
+
+  nGood_z = num(.not.ismissing(z))
+  if (nGood_z.lt.3) then
+      print("PDFXYZ: nGood(z)="+nGood_z+" : Need more non-missing points")
+  end if
+
+  if (nGood_x.lt.3 .or. nGood_y.lt.3 .or. nGood_z.lt.3) then
+      pdf3 = new( (/nbinsz,nbinsy,nbinsx/), "double", 1d20)
+      return( pdf3 )
+  end if
+
+  xMin = 0.0d     ; prototype as "double"    
+  xMax = 0.0d
+  yMin = 0.0d     ; prototype as "double"    
+  yMax = 0.0d
+  zMin = 0.0d     ; prototype as "double"    
+  zMax = 0.0d
+
+  if (opt .and. isatt(opt,"binx_min")) then  
+      xMin = opt@binx_min                   ; user set
+  else
+      xMin = min(x)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"binx_max")) then  
+      xMax = opt@binx_max                   ; user set
+  else
+      xMax = max(x)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"biny_min")) then  
+      yMin = opt@biny_min                   ; user set
+  else
+      yMin = min(y)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"biny_max")) then  
+      yMax = opt@biny_max                   ; user set
+  else
+      yMax = max(y)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"binz_min")) then  
+      zMin = opt@binz_min                   ; user set
+  else
+      zMin = min(z)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"binz_max")) then  
+      zMax = opt@binz_max                   ; user set
+  else
+      zMax = max(z)                         ; calculate
+  end if
+
+  if (opt .and. isatt(opt,"binx_nice")) then ; nice xMin, xMax
+      outside = True
+      if (isatt(opt,"binx_nice_outside")) then
+          outside = opt@binx_nice_outside
+      end if
+     ;mnmxint = nice_mnmxintvl( min(x), max(x), nbinsx, outside)
+      mnmxint = nice_mnmxintvl( xMin  , xMax  , nbinsx, outside)
+      xMin    = mnmxint(0)
+      xMax    = mnmxint(1)
+      xSpace  = mnmxint(2)
+      nbinsx  = round( (xMax-xMin)/xSpace , 3) 
+      delete(mnmxint)
+  end if
+
+  if (opt .and. isatt(opt,"biny_nice")) then ; nice yMin, yMax
+      outside = True
+      if (isatt(opt,"biny_nice_outside")) then
+          outside = opt@biny_nice_outside
+      end if
+     ;mnmxint = nice_mnmxintvl( min(y), max(y), nbinsy, outside)
+      mnmxint = nice_mnmxintvl( yMin  , yMax  , nbinsy, outside)
+      yMin    = mnmxint(0)
+      yMax    = mnmxint(1)
+      ySpace  = mnmxint(2)
+      nbinsy  = round( (yMax-yMin)/ySpace , 3) 
+      delete(mnmxint)
+  end if
+
+  if (opt .and. isatt(opt,"binz_nice")) then ; nice zMin, zMax
+      outside = True
+      if (isatt(opt,"binz_nice_outside")) then
+          outside = opt@binz_nice_outside
+      end if
+     ;mnmxint = nice_mnmxintvl( min(z), max(z), nbinsz, outside)
+      mnmxint = nice_mnmxintvl( zMin  , zMax  , nbinsz, outside)
+      zMin    = mnmxint(0)
+      zMax    = mnmxint(1)
+      zSpace  = mnmxint(2)
+      nbinsz  = round( (zMax-zMin)/zSpace , 3) 
+      delete(mnmxint)
+  end if
+
+  dbinx       = (xMax-xMin)/(nbinsx-1)
+  binxBound   = xMin + ispan(0,nbinsx,1)*dbinx
+  binxCenter  = (binxBound(0:nbinsx-1) + binxBound(1:nbinsx))*0.5d 
+
+  dbiny       = (yMax-yMin)/(nbinsy-1)
+  binyBound   = yMin + ispan(0,nbinsy,1)*dbiny
+  binyCenter  = (binyBound(0:nbinsy-1) + binyBound(1:nbinsy))*0.5d 
+
+  dbinz       = (zMax-zMin)/(nbinsz-1)
+  binzBound   = zMin + ispan(0,nbinsz,1)*dbinz
+  binzCenter  = (binzBound(0:nbinsz-1) + binzBound(1:nbinsz))*0.5d 
+
+  pdf3        = new( (/nbinsz,nbinsy,nbinsx/), "double", 1d20)
+  pdf3        = 0.0d
+
+  do nbz=0,nbinsz-1
+    do nby=0,nbinsy-1
+      do nbx=0,nbinsx-1
+         pdf3(nbz,nby,nbx) = num(x.ge.binxBound(nbx) .and. x.lt.binxBound(nbx+1) .and.\
+                                 y.ge.binyBound(nby) .and. y.lt.binyBound(nby+1) .and.\
+                                 z.ge.binzBound(nbz) .and. z.lt.binzBound(nbz+1) )
+      end do
+    end do
+  end do
+
+  pdf3!0   = "z"         ; arbitrary name
+  pdf3!1   = "y"
+  pdf3!2   = "x"
+  pdf3&z   =  binzCenter
+  pdf3&y   =  binyCenter
+  pdf3&x   =  binxCenter
+
+  pdf3_sum = sum(pdf3)
+ 
+  nTot = toint(pdf3_sum)                     ; those within bin boundaries
+  pdf3 = pdf3/nTot                           ; frequency
+ ;pdf3@units          = "frequency"
+
+ ;pdf3 = pdf3*100
+ ;pdf3@units          = "%"
+
+  pdf3@nTOT            = nGood_x + nGood_y +nGood_z
+  pdf3@nTot            = nTot                ; Used in Bins
+
+  pdf3@binx_center     = binxCenter
+  pdf3@binx_bounds     = binxBound
+  pdf3@biny_center     = binyCenter
+  pdf3@biny_bounds     = binyBound
+  pdf3@binz_center     = binzCenter
+  pdf3@binz_bounds     = binzBound
+
+  pdf3@binx_bound_min  = min(binxBound)
+  pdf3@binx_bound_max  = max(binxBound)
+  pdf3@binx_spacing    = binxBound(2)-binxBound(1)
+  pdf3@biny_bound_min  = min(binyBound)
+  pdf3@biny_bound_max  = max(binyBound)
+  pdf3@biny_spacing    = binyBound(2)-binyBound(1)
+  pdf3@binz_bound_min  = min(binzBound)
+  pdf3@binz_bound_max  = max(binzBound)
+  pdf3@binz_spacing    = binzBound(2)-binzBound(1)
+
+  pdf3@nbinsx          = nbinsx
+  pdf3@nbinsy          = nbinsy
+  pdf3@nbinsz          = nbinsz
+
+ ;pdf3@long_name      = "Joint PDF: 3D"
+ ;if (isatt(x,"long_name") .and. isatt(y,"long_name" .and. isatt(z,"long_name")) then
+ ;    pdf3@long_name  = "Joint PDF: "+x@long_name+"/"+y@long_name+"/"+z@long_name
+ ;end if
+  
+  return( pdf3 )
+end
+;-------
+undef("unwrap_phase_matlab")
+function unwrap_phase_matlab(p[*]:numeric)    ; p <==> wrapped phase
+;
+; Near One-to-One translation of Matlab's 'unwrap': See bottom for Matlab code
+; This handles _FillValue.
+; ---
+; Source:
+; https://www.ljmu.ac.uk/~/media/files/ljmu/about-us/faculties-and-schools/tae/geri/onedimensionalphaseunwrapping_finalpdf
+;
+begin
+;---NCL (currently) does not have an 'eps' (machine epsilon)
+;---The following is more than good enough for our purposes.
+
+  if (typeof(p).eq."double") then    
+      eps = 5d-15
+  else
+      eps = 5e-6
+  end if
+
+  pi  = get_pi(p)
+  N   = dimsizes(p)
+  up  = new( N, typeof(p), getVarFillValue(p))
+
+  po    = totype(0, typeof(p))
+  thr   = pi - eps
+  pi2   = 2*pi
+
+  if (any(ismissing(p))) then
+      ii    = ind(.not.ismissing(p))
+      nii   = dimsizes(ii)
+      iStrt = ii(0)+1
+      iLast = ii(nii-1)
+  else
+      iStrt = 1             ; NCL is 0-based
+      iLast = N-1
+  end if
+
+  pm1   = p(iStrt)          ; NCL is 0-based
+  up(0) = p(iStrt-1)
+  
+  do i=iStrt,iLast
+     cp = p(i) + po
+     dp = cp - pm1
+     pm1= cp
+
+     if (dp.gt.thr) then
+         do while (dp.gt.thr)
+            po = po - pi2
+            dp = dp - pi2
+         end do
+     end if
+
+     if (dp.lt.(-thr)) then
+         do while (dp.lt.(-thr))
+            po = po + pi2
+            dp = dp + pi2
+         end do
+     end if
+
+     cp    = p(i) + po
+     pm1   = cp
+     up(i) = cp
+  end do
+
+  up@long_name = "umwrapped phase"
+  up@units     = "radians"
+  copy_VarCoords(p,up)
+  return(up)
+;;
+;; Matlab is 1-based
+;;
+;; function up = unwrap(p)
+;; %UNWRAP unwrap phase
+;;   N = length(p);
+;;   up = zeros(size(p));
+;;   pm1 = p(1);
+;;   up(1) = pm1;
+;;   po = 0;
+;;   thr = pi - eps;
+;;   pi2 = 2*pi;
+;;   for i=2:N
+;;     cp = p(i) + po;
+;;     dp = cp- pm1;
+;;     pm1 = cp;
+;;     if dp>thr
+;;       while dp>thr
+;;         po = po - pi2
+;;         dp = dp - pi2;
+;;       end
+;;     end
+;;     if dp<- thr
+;;       while dp<- thr
+;;         po = po + pi2
+;;         dp = dp + pi2;
+;;       end
+;;     end
+;;     cp = p(i) + po;
+;;     pm1 = cp;
+;;     up(i) = cp;
+;;   end
+  
+end

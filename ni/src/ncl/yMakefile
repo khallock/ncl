@@ -161,18 +161,7 @@ OpenCL_OBJS = openclAddProto.o openclAddFuncs.o
 #endif
 
 #if defined(BuildGDAL)
-#if defined(sun)
-CC_LD		= g\+\+ -R/opt/SUNWspro/lib -L/opt/SUNWspro/lib
-CCOPTIONS	= $(EXTRA_CCOPTIONS)
-#elif defined(AIX)
-CC_LD		= xlC_r
-#elif defined(Darwin)
-CC_LD		= g\+\+
-#elif defined(linux)
-CC_LD		= g\+\+
-#else
-CC_LD		= g\+\+
-#endif
+CC_LD		= $(CXX)
 #endif
 
 #ifdef  HPUX
@@ -418,7 +407,8 @@ STATIC_SRCS	=	AddBuiltIns.c AddHLUObjs.c \
 			complete.c editline.c sysunix.c ListSupport.c \
 			NclList.c NclMultiDVallistData.c \
 			NclProf.c NclTime.c \
-			NclDriver.c PrintToken.c
+			NclDriver.c PrintToken.c \
+			subprocess.c
 
 
 FSRCS		=	qu2reg3.f rowina3.f scm0.f ncepcode.f
@@ -464,7 +454,8 @@ STATIC_OBJS	=	AddBuiltIns.o AddHLUObjs.o \
 			HLUFunctions.o yywrap.o craybin.o \
 			complete.o editline.o sysunix.o ListSupport.o \
 			NclList.o NclMultiDVallistData.o \
-			NclProf.o NclTime.o PrintToken.o
+			NclProf.o NclTime.o PrintToken.o \
+			subprocess.o
 
 
 FOBJS		=	qu2reg3.o rowina3.o scm0.o ncepcode.o

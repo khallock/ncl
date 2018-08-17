@@ -68,6 +68,7 @@ extern NhlErrorTypes snindex_yrmo_W(void);
 #ifdef BuildEEMD
 extern NhlErrorTypes ceemdan_W(void);
 extern NhlErrorTypes eemd_W(void);
+extern NhlErrorTypes meemd_W(void);
 extern NhlErrorTypes emd_num_imfs_W(void);
 #endif
 extern NhlErrorTypes x_skewt_W(void);
@@ -425,7 +426,9 @@ extern NhlErrorTypes dim_avg_wgt_n_W(void);
 extern NhlErrorTypes dim_sum_wgt_W(void);
 extern NhlErrorTypes dim_sum_wgt_n_W(void);
 extern NhlErrorTypes dim_acumrun_n_W(void);
+extern NhlErrorTypes kde_n_W(void);
 extern NhlErrorTypes esacr_W(void);
+extern NhlErrorTypes esacr_n_W(void);
 extern NhlErrorTypes esacv_W(void);
 extern NhlErrorTypes esccr_W(void);
 extern NhlErrorTypes esccr_shields_W(void);
@@ -565,6 +568,7 @@ extern NhlErrorTypes ttest_W(void);
 extern NhlErrorTypes ftest_W(void);
 extern NhlErrorTypes rtest_W(void);
 extern NhlErrorTypes equiv_sample_size_W(void);
+extern NhlErrorTypes equiv_sample_size_n_W(void);
 extern NhlErrorTypes z2geouv_W(void);
 extern NhlErrorTypes NhlGetNamedColorIndex_W(void);
 extern NhlErrorTypes rgba_to_color_index_W(void);
@@ -1397,6 +1401,22 @@ void NclAddUserFuncs(void)
     SetArgTemplate(args,nargs,"logical",1,dimsizes);nargs++;
     SetArgTemplate(args,nargs,"integer",1,NclANY);nargs++;
     NclRegisterFunc(eemd_W,args,"eemd",nargs);
+
+/*
+ * Register "meemd"
+ *
+ * Create private argument array.
+ */
+    nargs = 0;
+    args = NewArgs(6);
+    dimsizes[0] = 1;
+    SetArgTemplate(args,nargs,"numeric",0,NclANY);nargs++;
+    SetArgTemplate(args,nargs,"numeric",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"numeric",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"numeric",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"logical",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"integer",1,NclANY);nargs++;
+    NclRegisterFunc(meemd_W,args,"meemd",nargs);
 
 /*
  * Register "emd_num_imfs".
@@ -3799,11 +3819,11 @@ void NclAddUserFuncs(void)
     nargs = 0;
     args = NewArgs(5);
     dimsizes[0] = 1;
-    SetArgTemplate(args, nargs, "float", 1, dimsizes); nargs++;
-    SetArgTemplate(args, nargs, "float", 1, dimsizes); nargs++;
-    SetArgTemplate(args, nargs, "float", 1, dimsizes); nargs++;
-    SetArgTemplate(args, nargs, "float", 1, NclANY); nargs++;
-    SetArgTemplate(args, nargs, "float", 1, NclANY); nargs++;
+    SetArgTemplate(args, nargs, "numeric", 1, dimsizes); nargs++;
+    SetArgTemplate(args, nargs, "numeric", 1, dimsizes); nargs++;
+    SetArgTemplate(args, nargs, "numeric", 1, dimsizes); nargs++;
+    SetArgTemplate(args, nargs, "numeric", 1, NclANY); nargs++;
+    SetArgTemplate(args, nargs, "numeric", 1, NclANY); nargs++;
     NclRegisterProc(nggcog_W, args, "nggcog", nargs);
 
 /*
@@ -6302,6 +6322,20 @@ void NclAddUserFuncs(void)
     NclRegisterFunc(dim_acumrun_n_W,args,"dim_acumrun_n",nargs);
 
 /*
+ * Register "kde_n" ("kde_n_test" in NCL V6.5.0).
+ *
+ * Create private argument array
+ */
+    nargs = 0;
+    args = NewArgs(3);
+
+    SetArgTemplate(args,nargs,"numeric",0,NclANY);nargs++;
+    SetArgTemplate(args,nargs,"numeric",1,NclANY);nargs++;
+    SetArgTemplate(args,nargs,"integer",1,NclANY);nargs++;
+
+    NclRegisterFunc(kde_n_W,args,KDE_NAME,nargs);
+
+/*
  * Register "dim_spi_n".
  *
  * Create private argument array
@@ -6328,6 +6362,18 @@ void NclAddUserFuncs(void)
     SetArgTemplate(args,nargs,"integer",0,NclANY);nargs++;
 
     NclRegisterFunc(esacr_W,args,"esacr",nargs);
+/*
+ * Register "esacr_n".
+ *
+ * Create private argument array.
+ */
+    nargs = 0;
+    args = NewArgs(3);
+    SetArgTemplate(args,nargs,"numeric",0,NclANY);nargs++;
+    SetArgTemplate(args,nargs,"integer",0,NclANY);nargs++;
+    dimsizes[0] = 1;
+    SetArgTemplate(args,nargs,"integer",1,dimsizes);nargs++;
+    NclRegisterFunc(esacr_n_W,args,"esacr_n",nargs);
 /*
  * Register "esacv".
  *
@@ -7817,6 +7863,19 @@ void NclAddUserFuncs(void)
     SetArgTemplate(args,nargs,"integer",1,dimsizes);nargs++;
 
     NclRegisterFunc(equiv_sample_size_W,args,"equiv_sample_size",nargs);
+
+/*
+ * Register "equiv_sample_size_n".
+ */
+    nargs = 0;
+    args = NewArgs(4);
+    SetArgTemplate(args,nargs,"numeric",0,NclANY);nargs++;
+    dimsizes[0] = 1;
+    SetArgTemplate(args,nargs,"numeric",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"integer",1,dimsizes);nargs++;
+    SetArgTemplate(args,nargs,"integer",1,dimsizes);nargs++;
+
+    NclRegisterFunc(equiv_sample_size_n_W,args,"equiv_sample_size_n",nargs);
 
 /*
  * Register "z2geouv".
@@ -9517,6 +9576,63 @@ NclScalar         *missing_dx
 }
 
 /*
+ * Coerce a non-contiguous subset of the data to float.
+ */
+void coerce_subset_input_float_step(
+void              *x,
+float             *tmp_x,
+ng_size_t         index_x,
+ng_size_t         step_x,
+NclBasicDataTypes type_x,
+ng_size_t         size_x,
+int               has_missing_x,
+NclScalar         *missing_x,
+NclScalar         *missing_fx
+)
+{
+  ng_size_t i, ii;
+  NclTypeClass typeclass_x;
+  
+/*
+ * typeclass_x is what allows us to get the size of the type of x.
+ */
+  typeclass_x = (NclTypeClass)_NclNameToTypeClass(NrmStringToQuark(_NclBasicDataTypeToName(type_x)));
+/*
+ * Coerce x to float.
+ */
+  if(has_missing_x) {
+/*
+ * Coerce subset to double, with missing values.
+ */
+    for(i = 0; i < size_x; i++ ) {
+      ii = step_x*i;
+      _Nclcoerce((NclTypeClass)nclTypefloatClass,
+                 &tmp_x[i],
+                 (void*)((char*)x+(index_x+ii)*(typeclass_x->type_class.size)),
+                 1,
+                 missing_x,
+                 missing_fx,
+                 typeclass_x);
+    }
+  }
+  else {
+/*
+ * Coerce subset to float, with no missing values.
+ */
+    for(i = 0; i < size_x; i++ ) {
+      ii = step_x*i;
+      _Nclcoerce((NclTypeClass)nclTypefloatClass,
+                 &tmp_x[i],
+                 (void*)((char*)x+(index_x+ii)*(typeclass_x->type_class.size)),
+                 1,
+                 NULL,
+                 NULL,
+                 typeclass_x);
+    }
+  }
+}
+
+/*
  * Checks if a variable is a scalar or not.
  * Returns 1 if it is, and a 0 if it isn't.
  */
@@ -9950,6 +10066,25 @@ ng_size_t step_x
 
 
 /*
+ * Copy float data back to float non-contiguous array, using a void array. 
+ * This was created for the meemd wrapper, which was interfacing to a F90
+ * routine that only handles floats. We hope to replace this routine with
+ * doubles. We can then get rid of this routine if nobody else is using it.
+ */
+void coerce_output_float_step(
+void   *x,
+float  *fx,
+ng_size_t size_x,
+ng_size_t index_x,
+ng_size_t step_x
+)
+{
+  ng_size_t i;
+  for( i = 0; i < size_x; i++ ) ((float*)x)[index_x+(step_x*i)]  = fx[i];
+}
+
+
+/*
  * Copy double data back to double, float, long, or int non-contiguous
  * array, using a void array.  Really, there's no need for both
  * coerce_output_step and coerce_output_float_or_double_step to
@@ -9987,7 +10122,9 @@ ng_size_t step_x
 
 /*
  * Coerce data to float, or just return a pointer to it if
- * it is already float.
+ * it is already float. NOTE: this function does not work
+ * for coercing double to float. You must use it on a float
+ * type or lower (int, short, byte, etc).
  */
 float *coerce_input_float(
 void              *x,
@@ -10034,7 +10171,9 @@ NclScalar         *missing_fx)
 
 /*
  * Coerce data to int, or just return a pointer to it if
- * it is already int.
+ * it is already int. NOTE: this function does not work
+ * for coercing double/float to int. You must use it on
+ * an int type or lower (short, byte, etc).
  */
 int *coerce_input_int(
 void              *x,

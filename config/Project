@@ -24,8 +24,8 @@
  *			etc are in the Template file.
  */
 
-#define NcargVersion 6.4.0
-#define NclVersion 6.4.0
+#define NcargVersion 6.5.0
+#define NclVersion 6.5.0
 
 #ifndef	BuildNCL
 #define	BuildNCL
@@ -246,12 +246,12 @@
 #endif	/* PNGlib */
 
 #ifndef CAIROlib
-#define CAIROlib -lcairo -lXrender -lfontconfig -lpixman-1 -lfreetype -lexpat -lpng -lz -liconv -lbz2
+#define CAIROlib -lcairo -lXrender -lfontconfig -lpixman-1 -lfreetype -lexpat -lpng -lz -lbz2
 #endif
 
 /* This should be same as CAIROlib except with no explicit paths */
 #ifndef CAIROlibuser
-#define CAIROlibuser -lcairo -lXrender -lfontconfig -lpixman-1 -lfreetype -lexpat -lpng -lz -liconv -lbz2
+#define CAIROlibuser -lcairo -lXrender -lfontconfig -lpixman-1 -lfreetype -lexpat -lpng -lz -lbz2
 #endif
 
 #ifdef	BuildHDFEOS
@@ -311,9 +311,7 @@
 #endif	/* EEMDlib */
 
 #ifndef	NetCDFlib
-#define	NetCDFlib	-lnetcdf -lcurl
-/*#define	NetCDFlib	-lnetcdf -lcurl -lssl -lidn -lrt -lldap */
-/*#define	NetCDFlib	-lnetcdf -lcurl -lcrypto -lldap -lssl */
+#define NetCDFlib	-lnetcdf -lcurl
 #endif	/* NetCDFlib */
 
 #ifndef	NetCDF4lib

@@ -279,13 +279,11 @@ begin
     print("_fix_labelbar_resources: Warning: " + end_on_res + " is deprecated.")
     if(isatt(cres,end_res_name)) then
       print("  Your setting of " + end_res_name + " will override it.")
-    else if(cres@$end_on_res$) then
+    elseif(cres@$end_on_res$) then
       print("  Will remove it and set " + end_res_name + " to 'IncludeMinMaxLabels'.")
       cres@$end_res_name$ = "IncludeMinMaxLabels"
-    else if(.not.cres@$end_on_res$) then
+    elseif(.not.cres@$end_on_res$) then
       print("  Will remove it.")
-    end if
-    end if
     end if
     delete(cres@$end_on_res$)
   end if
@@ -1324,10 +1322,10 @@ begin
     if(isatt(plot,"contour")) then
       new_plot = plot@contour
       new_plot@plot_type = "contour"
-    else if(isatt(plot,"vector")) then
+    elseif(isatt(plot,"vector")) then
       new_plot = plot@vector
       new_plot@plot_type = "vector"
-    else if(isatt(plot,"streamline")) then
+    elseif(isatt(plot,"streamline")) then
       new_plot = plot@streamline
       new_plot@plot_type = "streamline"
     else
@@ -1344,21 +1342,18 @@ begin
             new_plot = base_ids(i)
             new_plot@plot_type = "contour"
             found = True
-          else if(bclass.eq."vectorPlotClass") then
+          elseif(bclass.eq."vectorPlotClass") then
             new_plot = base_ids(i)
             new_plot@plot_type = "vector"
             found = True
-          else if(bclass.eq."streamlinePlotClass") then
+          elseif(bclass.eq."streamlinePlotClass") then
             new_plot = base_ids(i)
             new_plot@plot_type = "streamline"
             found = True
-          else if(bclass.eq."xyPlotClass") then
+          elseif(bclass.eq."xyPlotClass") then
             new_plot = base_ids(i)
             new_plot@plot_type = "xy"
             found = True
-          end if
-          end if
-          end if
           end if
           i = i + 1
         end do
@@ -1367,24 +1362,19 @@ begin
         new_plot = plot(0)
       end if
     end if
-    end if
-    end if
   else
     if(class(0).eq."contourPlotClass") then
       new_plot = plot(0)
       new_plot@plot_type = "contour"
-    else if(class(0).eq."vectorPlotClass") then
+    elseif(class(0).eq."vectorPlotClass") then
       new_plot = plot(0)
       new_plot@plot_type = "vector"
-    else if(class(0).eq."streamlinePlotClass") then
+    elseif(class(0).eq."streamlinePlotClass") then
       new_plot = plot(0)
       new_plot@plot_type = "streamline"
-    else if(class(0).eq."xyPlotClass") then
+    elseif(class(0).eq."xyPlotClass") then
       new_plot = plot(0)
       new_plot@plot_type = "xy"
-    end if
-    end if
-    end if
     end if
   end if
   return(new_plot)
@@ -3753,7 +3743,7 @@ begin
 ; Create a canvas to draw on.
 ;
     canvas = create "ndc_canvas" logLinPlotClass wks
-      "tfDoNDCOverlay" : True
+      "tfDoNDCOverlay" : "NDCViewport"
       "trXMinF"        : vpx
       "trXMaxF"        : vpx+vpw
       "trYMaxF"        : vpy
@@ -4239,17 +4229,117 @@ begin
 end
 
 ;***********************************************************************;
+; This function is used by the gsn_add_shapefile_polyxxxx routines to   ;
+; check if a given file is a valid shapefile for plotting. The          ;
+; exp_geom_type must be a string set to point, polyline, or polygon.    ;
+;***********************************************************************;
+undef("is_valid_shapefile")
+function is_valid_shapefile(fin[1]:file,exp_geom_type[1]:string)
+local req_vars, nreqv, n, geom_dims, num_features
+begin
+  if(.not.any(exp_geom_type.eq.(/"polygon","polyline","point"/))) then
+    print("is_valid_shapefile: Error: an internal error has occurred.")
+    print("     Not sure how to check validity of shapefile.")
+    print("     No shapefile information will be added.")
+    return(False)
+  end if
+
+;----------------------------------------------------------------------
+; Test for required variables on shapefile
+;----------------------------------------------------------------------
+  req_vars = (/"x","y","segments","geometry"/)
+  nreqv    = dimsizes(req_vars)
+  do n=0,nreqv-1
+    if(.not.isfilevar(fin,req_vars(n))) then
+      print("is_valid_shapefile: Error: shapefile doesn't have the required '" + req_vars(n) + "'")
+      print("     variable. No shapefile information will be added.")
+      return(False)
+    end if
+  end do
+;----------------------------------------------------------------------
+; Test that we actually have some features in the file.
+;----------------------------------------------------------------------
+  geom_dims    = getfilevardimsizes(fin,"geometry")
+  num_features = geom_dims(0)
+  if(num_features.le.0) then
+    print("is_valid_shapefile: Error: the number of features in the shapefile is <= 0.")
+    print("     No shapefile information will be added.")
+    return(False)
+  end if
+
+;----------------------------------------------------------------------
+; Test "geometry_type" global attribute.
+;----------------------------------------------------------------------
+  if(.not.isatt(fin,"geometry_type")) then
+    if(exp_geom_type.eq."polygon") then
+      print("is_valid_shapefile: Error: shapefile has no 'geometry_type' attribute.")
+      print("     No shapefile polygons will be added.")
+      return(False)
+    elseif(exp_geom_type.eq."polyline") then
+      print("is_valid_shapefile: Warning: shapefile has no 'geometry_type' attribute.")
+      print("     Will attempt to add shapefile polylines anyway.")
+    elseif(exp_geom_type.eq."point") then
+      print("is_valid_shapefile: Warning: shapefile has no 'geometry_type' attribute.")
+      print("     Will attempt to add shapefile markers anyway.")
+    end if
+  elseif(.not.any(fin@geometry_type.eq.(/"point","polygon","polyline"/)))
+    if(exp_geom_type.eq."point") then
+      print("is_valid_shapefile: Warning: geometry_type attribute in shapefile is")
+      print("     not recognized ('" + fin@geometry_type + "').")
+      print("     Will attempt to add shapefile markers anyway.")
+    else
+      print("is_valid_shapefile: Error: geometry_type attribute in shapefile is")
+      print("     not recognized ('" + fin@geometry_type + "').")
+      print("     Will attempt to add shapefile markers anyway.")
+      print("       Perhaps use gsn_add_shapefile_polymarkers to plot this data.")
+      return(False)
+    end if
+  elseif(fin@geometry_type.eq."point".and.any(exp_geom_type.eq.(/"polyline","polygon"/))) then
+    print("is_valid_shapefile: Error: geometry_type attribute in shapefile is")
+    print("     equal to 'point'. Cannot add shapefile polylines or polygons.")
+    print("     Use gsn_add_shapefile_polymarkers to plot this data.")
+    return(False)
+  elseif(any(fin@geometry_type.eq.(/"point","polyline"/)).and.exp_geom_type.eq."polygon") then
+    print("is_valid_shapefile: Error: geometry_type attribute in shapefile is equal")
+    print("     to '" + fin@geometry_type + "'. Cannot add shapefile polygons. Use")
+    print("     gsn_add_shapefile_polymarkers or gsn_add_shapefile_polylines")
+    print("     to plot this data.")
+    return(False)
+  end if
+;----------------------------------------------------------------------
+; Extra tests needed if plotting points. We don't need this for 
+; polylines or polygons, because we can just use gsSegments.
+;----------------------------------------------------------------------
+  if(exp_geom_type.eq."point") then
+    req_gatts = (/"geom_segIndex","geom_numSegs","segs_xyzIndex","segs_numPnts"/)
+    nreqa     = dimsizes(req_gatts)
+    do n=0,nreqa-1
+      if(.not.isatt(fin,req_gatts(n))) then
+        print("is_valid_shapefile: Error: shapefile doesn't have the required")
+        print("     '" + req_gatts(n) + "' global attribute for plotting markers.")
+        print("     No shapefile markers will be added.")
+        return(False)
+      end if
+    end do
+  end if
+
+;---If we've made it this far, then we should have a valid shapefile.
+  return(True)
+end
+
+;***********************************************************************;
 ; Procedure : gsn_shapefile_polylines                                   ;
 ;                   wks: workstation object                             ;
 ;                plotid: plot object                                    ;
 ;                 fname: Name of shapefile ("xxxx.shp")                 ;
 ;               resources: optional resources                           ;
 ;                                                                       ;
+; This code is deprecated. gsn_add_shapefile_polylines should be used.  ;
 ; ANY CHANGES MADE TO THIS CODE SHOULD POTENTIALLY BE MADE TO           ;
 ; gsn_add_shapefile_polylines BELOW!! Note that in V6.2.0, the "add"    ;
 ; version of this code was sped up significantly, so this procedure is  ;
 ; not needed so much anymore.                                           ;
-;
+;                                                                       ;
 ; This function draws shapefile polylines on the plot "plotid".         ;
 ; See gsn_add_shapefile_polylines if you want to add them instead (this ;
 ; can be much slower).                                                  ;
@@ -4271,17 +4361,20 @@ begin
 
 ;---Error checking
   if(ismissing(f)) then
-    print("Error: gsn_shapefile_polylines: Can't open shapefile '" + \
-           fname + "'")
+    print("Error: gsn_shapefile_polylines: Can't open shapefile '" + fname + "'")
     print("       No shapefile information will be added.")
     return(new(1,graphic))
-  end if
-
-;---We can't use this routine to plot point data
-  if(.not.any(f@geometry_type.eq.(/"polygon","polyline"/))) then
-    print("Error: gsn_shapefile_polylines: geometry_type attribute must be 'polygon' or 'polyline'")
+  elseif(.not.isatt(f,"geometry_type")) then
+    print("Error: gsn_shapefile_polylines: this shapefile has no 'geometry_type' attribute.")
     print("       No shapefile information will be added.")
     return(new(1,graphic))
+  elseif(f@geometry_type.eq."point") then
+    print("Error: gsn_shapefile_polylines: geometry_type attribute is equal to 'point'.")
+    print("       Use gsn_add_shapefile_polymarkers to plot this data.")
+    return(new(1,graphic))
+  elseif(.not.any(f@geometry_type.eq.(/"polygon","polyline"/))) then
+    print("Warning: gsn_shapefile_polylines: geometry_type attribute is not equal to 'polygon'")
+    print("         or 'polyline'. Will attempt to add shapefile outlines anyway.")
   end if
 
 ;---Read data off the shapefile
@@ -4377,23 +4470,13 @@ end
 ;***********************************************************************;
 undef("gsn_add_shapefile_polylines")
 function gsn_add_shapefile_polylines(wks,plots[*]:graphic,fname:string,lnres)
-local f, geomDims, numFeatures, lnres2
+local f, geomDims, numFeatures, lnres2, valid_shapefile
 begin
 ;---Open the shapefile
   f = addfile(fname,"r")
 
-;---Error checking
-  if(ismissing(f)) then
-    print("Error: gsn_add_shapefile_polylines: Can't open shapefile '" + \
-           fname + "'")
-    print("       No shapefile information will be added.")
-    return(new(1,graphic))
-  end if
-
-;---We can't use this routine to plot point data
-  if(.not.any(f@geometry_type.eq.(/"polygon","polyline"/))) then
-    print("Error: gsn_add_shapefile_polylines: geometry_type attribute must be 'polygon' or 'polyline'")
-    print("       No shapefile information will be added.")
+  valid_shapefile = is_valid_shapefile(f,"polyline")
+  if(.not.valid_shapefile) then
     return(new(1,graphic))
   end if
 
@@ -4401,15 +4484,6 @@ begin
     lnres2 = lnres      ; Make a copy so that we don't keep gsSegments
   else
     lnres2 = True
-  end if
-
-;---Read data off the shapefile
-  geomDims    = getfilevardimsizes(f,"geometry")
-  numFeatures = geomDims(0)
-  if(numFeatures.eq.0) then
-    print("Error: gsn_add_shapefile_polylines: the number of features in this file is 0.")
-    print("       No shapefile information will be added.")
-    return(new(1,graphic))
   end if
 
 ;;  segments = f->segments
@@ -4514,18 +4588,8 @@ begin
 ;---Open the shapefile
   f = addfile(fname,"r")
 
-;---Error checking
-  if(ismissing(f)) then
-    print("Error: gsn_add_shapefile_polygons: Can't open shapefile '" + \
-           fname + "'")
-    print("       No shapefile information will be added.")
-    return(new(1,graphic))
-  end if
-
-;---We can't use this routine to plot point data
-  if(f@geometry_type.ne."polygon") then
-    print("Error: gsn_add_shapefile_polygon: geometry_type attribute must be 'polygon'")
-    print("       No shapefile information will be added.")
+  valid_shapefile = is_valid_shapefile(f,"polygon")
+  if(.not.valid_shapefile) then
     return(new(1,graphic))
   end if
 
@@ -4533,7 +4597,7 @@ begin
   geomDims    = getfilevardimsizes(f,"geometry")
   numFeatures = geomDims(0)
   if(numFeatures.eq.0) then
-    print("Error: gsn_add_shapefile_polygon: the number of features in this file is 0.")
+    print("Error: gsn_add_shapefile_polygons: the number of features in this file is 0.")
     print("       No shapefile information will be added.")
     return(new(1,graphic))
   end if
@@ -4660,18 +4724,8 @@ begin
 ;---Open the shapefile
   f = addfile(fname,"r")
 
-;---Error checking
-  if(ismissing(f)) then
-    print("Error: gsn_add_shapefile_polymarkers: Can't open shapefile '" + \
-           fname + "'")
-    print("       No shapefile information will be added.")
-    return(new(1,graphic))
-  end if
-
-;---We can't use this routine to plot point data
-  if(f@geometry_type.ne."point") then
-    print("Error: gsn_add_shapefile_polymarkers: geometry_type attribute must be 'point'")
-    print("       No shapefile information will be added.")
+  valid_shapefile = is_valid_shapefile(f,"point")
+  if(.not.valid_shapefile) then
     return(new(1,graphic))
   end if
 
@@ -5155,58 +5209,64 @@ end
 ; "y" are the x and y locations of each text string, and should be      ;
 ; specified in NDC space. "resources" is an optional list of resources. ;
 ; This function returns the text string created.                        ;
+;                                                                       ;
+; This procedure was fixed for NCL V6.5.0 so that missing strings are   ;
+; not displayed.                                                        ;
 ;***********************************************************************;
 undef("gsn_create_text_ndc")
 function gsn_create_text_ndc(wks:graphic, texto:string, xo:numeric, \
                              yo:numeric, resources:logical )
 local i, txid, plot_object, res, tx_res_index, x, y, res2, \
-calldraw, callframe, xsize, ysize, tsize, len, dims
+calldraw, callframe, xsizes, ysizes, tsizes, xrank, yrank, trank, len, dims
 begin
 ;
 ; Any one of xo, yo, and texto can just be one element, but if two or more
 ; are more than one element, then they must be exactly the same size.
 ;
-  xsize = product(dimsizes(xo))
-  ysize = product(dimsizes(yo))
-  tsize = product(dimsizes(texto))
-  if((xsize.gt.1.and.ysize.gt.1.and.xsize.ne.ysize).or.\
-     (xsize.gt.1.and.tsize.gt.1.and.xsize.ne.tsize).or.\
-     (ysize.gt.1.and.tsize.gt.1.and.ysize.ne.tsize))
-    print("Error: gsn_create_text_ndc: x, y, and text must have the same dimension sizes, or be scalars.")
-    dummy = new(1,graphic)
-    return(dummy)
+  xsizes = dimsizes(xo)
+  ysizes = dimsizes(yo)
+  tsizes = dimsizes(texto)
+  xrank  = dimsizes(xsizes)
+  yrank  = dimsizes(ysizes)
+  trank  = dimsizes(tsizes)
+  if(xrank.gt.1.and.yrank.gt.1.and.((xrank.ne.yrank).or.(.not.all(xsizes.eq.ysizes)))) then
+    print("Error: gsn_text: x and y must have the same dimension sizes, or either be a single value.")
+    return
   end if
-
-;---Convert to 1-dimensional arrays of all the same length.
-  all_scalar = all((/xsize,ysize,tsize/).eq.1)
-  if(all_scalar.or.all((/xsize,ysize,tsize/).gt.1)) then
-    len  = xsize
-    dims = dimsizes(xo)
-    x    = ndtooned(xo)
-    y    = ndtooned(yo)
-    text = ndtooned(texto)
-  else  
-;---We know at least one of these is not a scalar.
-    len = max((/xsize,ysize,tsize/))
-    if(xsize.gt.1) then
-      x    = ndtooned(xo)
-      dims = dimsizes(xo)
-    else
-      x = conform_dims(len,xo,-1)
-    end if
-    if(ysize.gt.1) then
-      y    = ndtooned(yo)
-      dims = dimsizes(yo)
-    else
-      y = conform_dims(len,yo,-1)
-    end if
-    if(tsize.gt.1) then
-      text = ndtooned(texto)
-      dims = dimsizes(texto)
-    else
-      text = conform_dims(len,texto,-1)
-    end if
+  if(trank.gt.1.and. \
+     ((xrank.gt.1.and.((xrank.ne.trank).or.(.not.all(xsizes.eq.tsizes)))) .or. \
+      (yrank.gt.1.and.((yrank.ne.trank).or.(.not.all(ysizes.eq.tsizes)))))) then
+    print("Error: gsn_text_ndc: text must be a single string or the same dimension size as x and/or y.")
+    return
   end if
+;
+; Convert to 1-dimensional arrays of all the same length.
+;
+  if(xrank.gt.1) then
+    new_dims = xsizes
+  elseif(yrank.gt.1) then
+    new_dims = ysizes
+  elseif(trank.gt.1) then
+    new_dims = tsizes
+  else
+    new_dims = max((/tsizes,xsizes,ysizes/))
+  end if
+  x    = ndtooned(conform_dims(new_dims,xo,-1))
+  y    = ndtooned(conform_dims(new_dims,yo,-1))
+  text = ndtooned(conform_dims(new_dims,texto,-1))
+  contains_missing = False
+  if(any(ismissing(x)).or.any(ismissing(y)).or.any(ismissing(text)))
+    contains_missing = True
+    ind_nomsg = ind(.not.ismissing(x).and..not.ismissing(y).and..not.ismissing(text))
+    if(any(ismissing(ind_nomsg)))
+      print("Error: gsn_text_ndc: no valid strings to add, input data is all missing")
+      dummy = new(1,graphic)
+      return(dummy)
+    end if
+  else
+    ind_nomsg = ispan(0,dimsizes(x)-1,1)
+  end if
+  len  = dimsizes(ind_nomsg)
   res2 = get_resources(resources)
 
   wksname = get_res_value_keep(wks,"name","gsnapp")
@@ -5224,8 +5284,9 @@ begin
 ;
     if(all(x.lt.0).and.all(y.lt.0)) then
       do i=0,len-1
-        txid(i) = create wksname + "_text_ndc"+i textItemClass wks
-          "txString"   : text(i)
+        ii = ind_nomsg(i)
+        txid(i) = create wksname + "_text_ndc"+ii textItemClass wks
+          "txString"   : text(ii)
           "txFuncCode" : res2@txFuncCode
         end create
         attsetvalues_check(txid(i),txres)       ; Set text resources.
@@ -5233,10 +5294,11 @@ begin
       end do
     else
       do i=0,len-1
-        txid(i) = create wksname + "_text_ndc"+i textItemClass wks
-          "txString" : text(i)
-          "txPosXF"  : x(i)
-          "txPosYF"  : y(i)
+        ii = ind_nomsg(i)
+        txid(i) = create wksname + "_text_ndc"+ii textItemClass wks
+          "txString" : text(ii)
+          "txPosXF"  : x(ii)
+          "txPosYF"  : y(ii)
           "txFuncCode" : res2@txFuncCode
         end create
         attsetvalues_check(txid(i),txres)       ; Set text resources.
@@ -5249,18 +5311,20 @@ begin
 ;
     if(all(x.lt.0).and.all(y.lt.0)) then
       do i=0,len-1
-        txid(i) = create wksname + "_text_ndc"+i textItemClass wks
-          "txString" : text(i)
+        ii = ind_nomsg(i)
+        txid(i) = create wksname + "_text_ndc"+ii textItemClass wks
+          "txString" : text(ii)
         end create
         attsetvalues_check(txid(i),txres)       ; Set text resources.
         draw_and_frame(wks,txid(i),calldraw,callframe,0,maxbb)
       end do
     else
       do i=0,len-1
-        txid(i) = create wksname + "_text_ndc"+i textItemClass wks
-          "txString" : text(i)
-          "txPosXF"  : x(i)
-          "txPosYF"  : y(i)
+        ii = ind_nomsg(i)
+        txid(i) = create wksname + "_text_ndc"+ii textItemClass wks
+          "txString" : text(ii)
+          "txPosXF"  : x(ii)
+          "txPosYF"  : y(ii)
         end create
         attsetvalues_check(txid(i),txres)       ; Set text resources.
         draw_and_frame(wks,txid(i),calldraw,callframe,0,maxbb)
@@ -5268,10 +5332,10 @@ begin
     end if
   end if
 
-  if(all_scalar) then
-    return(txid)
+  if(contains_missing) then
+    return(txid(0:len-1))
   else
-    return(reshape(txid,dims))
+    return(onedtond(txid(0:len-1),new_dims))
   end if
 end
 
@@ -5329,6 +5393,9 @@ end
 ; "y" are the x and y locations of each text string, and should be      ;
 ; specified in the same data space as the data space of "plotid".       ;
 ; "resources" is an optional list of resources.                         ;
+;                                                                       ;
+; This procedure was fixed for NCL V6.5.0 so that missing strings are   ;
+; not displayed.                                                        ;
 ;***********************************************************************;
 undef("gsn_text")
 procedure gsn_text(wks:graphic,plotid:graphic,texto:string,xo:numeric, \
@@ -5346,13 +5413,13 @@ begin
   xrank  = dimsizes(xsizes)
   yrank  = dimsizes(ysizes)
   trank  = dimsizes(tsizes)
-  if(xrank.gt.1.and.yrank.gt.1.and..not.all(xsizes.eq.ysizes)) then
+  if(xrank.gt.1.and.yrank.gt.1.and.((xrank.ne.yrank).or.(.not.all(xsizes.eq.ysizes)))) then
     print("Error: gsn_text: x and y must have the same dimension sizes, or either be a single value.")
     return
   end if
   if(trank.gt.1.and. \
-     (xrank.gt.1.and..not.all(xsizes.eq.tsizes)) .or. \
-     (yrank.gt.1.and..not.all(ysizes.eq.tsizes))) then
+     ((xrank.gt.1.and.((xrank.ne.trank).or.(.not.all(xsizes.eq.tsizes)))) .or. \
+      (yrank.gt.1.and.((yrank.ne.trank).or.(.not.all(ysizes.eq.tsizes)))))) then
     print("Error: gsn_text: text must be a single string or the same dimension size as x and/or y.")
     return
   end if
@@ -5360,26 +5427,28 @@ begin
 ; Convert to 1-dimensional arrays of all the same length.
 ;
   if(xrank.gt.1) then
-    x    = ndtooned(new(xsizes, typeof(xo)))
-    y    = ndtooned(new(xsizes, typeof(yo)))
-    text = ndtooned(new(xsizes, typeof(texto)))
+    new_dims = xsizes
+  elseif(yrank.gt.1) then
+    new_dims = ysizes
   else
-    if(yrank.gt.1) then
-      x    = ndtooned(new(ysizes, typeof(xo)))
-      y    = ndtooned(new(ysizes, typeof(yo)))
-      text = ndtooned(new(ysizes, typeof(texto)))
-    else
-      x    = new(xsizes > ysizes, typeof(xo))
-      y    = new(xsizes > ysizes, typeof(yo))
-      text = new(xsizes > ysizes, typeof(texto))
-    end if
+    new_dims = xsizes > ysizes
   end if
-
-  x    = ndtooned(xo)
-  y    = ndtooned(yo)
-  text = ndtooned(texto)
-  len  = dimsizes(x)
-
+  x    = ndtooned(conform_dims(new_dims,xo,-1))
+  y    = ndtooned(conform_dims(new_dims,yo,-1))
+  text = ndtooned(conform_dims(new_dims,texto,-1))
+  contains_missing = False
+  if(any(ismissing(x)).or.any(ismissing(y)).or.any(ismissing(text)))
+    contains_missing = True
+    ind_nomsg = ind(.not.ismissing(x).and..not.ismissing(y).and..not.ismissing(text))
+    if(any(ismissing(ind_nomsg)))
+      print("Error: gsn_text: no valid strings to add, input data is all missing")
+      dummy = new(1,graphic)
+      return(dummy)
+    end if
+  else
+    ind_nomsg = ispan(0,dimsizes(x)-1,1)
+  end if
+  len  = dimsizes(ind_nomsg)
   res2 = get_resources(resources)
 
   calldraw  = get_res_value(res2,"gsnDraw", True)
@@ -5410,10 +5479,11 @@ begin
 
   if(res2.and.isatt(res2,"txFuncCode")) then
     do i=0,len-1
-      txid = create wksname + "_text"+i textItemClass wks
-        "txString"   : text(i)
-        "txPosXF"    : x2(i)
-        "txPosYF"    : y2(i)
+      ii = ind_nomsg(i)
+      txid(i) = create wksname + "_text"+i textItemClass wks
+        "txString"   : text(ii)
+        "txPosXF"    : x2(ii)
+        "txPosYF"    : y2(ii)
         "txFuncCode" : res2@txFuncCode
       end create
       attsetvalues_check(txid(i),txres)            ; Set text resources.
@@ -5421,10 +5491,11 @@ begin
     end do
   else 
     do i=0,len-1
-      txid(i) = create wksname + "_text"+i textItemClass wks
-        "txString"   : text(i)
-        "txPosXF"    : x2(i)
-        "txPosYF"    : y2(i)
+      ii = ind_nomsg(i)
+      txid(i) = create wksname + "_text"+ii textItemClass wks
+        "txString"   : text(ii)
+        "txPosXF"    : x2(ii)
+        "txPosYF"    : y2(ii)
       end create
       attsetvalues_check(txid(i),txres)            ; Set text resources.
       draw_and_frame(wks,txid(i),calldraw,callframe,0,maxbb)
@@ -5449,11 +5520,14 @@ end
 ; This function is different from gsn_text because it actually attaches ;
 ; the text to the plot. This means that if you resize or move the plot, ;
 ; the text will stay with the plot.                                     ;
+;                                                                       ;
+; This function was fixed for NCL V6.5.0 so that missing strings are    ;
+; not displayed.                                                        ;
 ;***********************************************************************;
 undef("gsn_add_text")
 function gsn_add_text(wks:graphic,plotid:graphic,texto:string, \
                       xo:numeric,yo:numeric, resources:logical )
-local txid, txres, amres, just, res2, wksname, am_ids
+local txid, txres, amres, just, res2, wksname, am_ids, new_dims, contains_missing
 begin
 ;
 ; Any one of xo, yo, and texto can just be one element, but if two or more
@@ -5465,14 +5539,14 @@ begin
   xrank  = dimsizes(xsizes)
   yrank  = dimsizes(ysizes)
   trank  = dimsizes(tsizes)
-  if(xrank.gt.1.and.yrank.gt.1.and..not.all(xsizes.eq.ysizes)) then
+  if(xrank.gt.1.and.yrank.gt.1.and.((xrank.ne.yrank).or.(.not.all(xsizes.eq.ysizes)))) then
     print("Error: gsn_add_text: x and y must have the same dimension sizes, or either be a single value.")
     dummy = new(1,graphic)
     return(dummy)
   end if
   if(trank.gt.1.and. \
-     (xrank.gt.1.and..not.all(xsizes.eq.tsizes)) .or. \
-     (yrank.gt.1.and..not.all(ysizes.eq.tsizes))) then
+     ((xrank.gt.1.and.((xrank.ne.trank).or.(.not.all(xsizes.eq.tsizes)))) .or. \
+      (yrank.gt.1.and.((yrank.ne.trank).or.(.not.all(ysizes.eq.tsizes)))))) then
     print("Error: gsn_add_text: text must be a single string or the same dimension size as x and/or y.")
     dummy = new(1,graphic)
     return(dummy)
@@ -5481,26 +5555,29 @@ begin
 ; Convert to 1-dimensional arrays of all the same length.
 ;
   if(xrank.gt.1) then
-    x    = ndtooned(new(xsizes, typeof(xo)))
-    y    = ndtooned(new(xsizes, typeof(yo)))
-    text = ndtooned(new(xsizes, typeof(texto)))
+    new_dims = xsizes
+  elseif(yrank.gt.1) then
+    new_dims = ysizes
   else
-    if(yrank.gt.1) then
-      x    = ndtooned(new(ysizes, typeof(xo)))
-      y    = ndtooned(new(ysizes, typeof(yo)))
-      text = ndtooned(new(ysizes, typeof(texto)))
-    else
-      x    = new(xsizes > ysizes, typeof(xo))
-      y    = new(xsizes > ysizes, typeof(yo))
-      text = new(xsizes > ysizes, typeof(texto))
-    end if
+    new_dims = xsizes > ysizes
   end if
+  x    = ndtooned(conform_dims(new_dims,xo,-1))
+  y    = ndtooned(conform_dims(new_dims,yo,-1))
+  text = ndtooned(conform_dims(new_dims,texto,-1))
 
-  x    = ndtooned(xo)
-  y    = ndtooned(yo)
-  text = ndtooned(texto)
-  len  = dimsizes(x)
-
+  contains_missing = False
+  if(any(ismissing(x)).or.any(ismissing(y)).or.any(ismissing(text)))
+    contains_missing = True
+    ind_nomsg = ind(.not.ismissing(x).and..not.ismissing(y).and..not.ismissing(text))
+    if(any(ismissing(ind_nomsg)))
+      print("Error: gsn_add_text: no valid strings to add, input data is all missing")
+      dummy = new(1,graphic)
+      return(dummy)
+    end if
+  else
+    ind_nomsg = ispan(0,dimsizes(x)-1,1)
+  end if
+  len  = dimsizes(ind_nomsg)
   res2 = get_resources(resources)
 ;
 ; The "txFuncCode" can't be set during a setvalues call. It must be
@@ -5513,16 +5590,18 @@ begin
 
   if(res2.and.isatt(res2,"txFuncCode")) then
     do i=0,len-1
-      txid(i) = create wksname + "_text"+i textItemClass wks
-        "txString"   : text(i)
+      ii = ind_nomsg(i)
+      txid(i) = create wksname + "_text"+ii textItemClass wks
+        "txString"   : text(ii)
         "txFuncCode" : res2@txFuncCode
       end create
       attsetvalues_check(txid(i),txres)          ; Set text resources.
     end do
   else
     do i=0,len-1
-      txid(i) = create wksname + "_text"+i textItemClass wks
-        "txString" : text(i)
+      ii = ind_nomsg(i)
+      txid(i) = create wksname + "_text"+ii textItemClass wks
+        "txString" : text(ii)
       end create
       attsetvalues_check(txid(i),txres)          ; Set text resources.
     end do
@@ -5562,9 +5641,10 @@ begin
   just      = get_res_value(res2,"amJust",tmp_just)
 
   do i=0,len-1
+    ii = ind_nomsg(i)
     setvalues am_ids(i)
-      "amDataXF"       : x(i)
-      "amDataYF"       : y(i)
+      "amDataXF"       : x(ii)
+      "amDataYF"       : y(ii)
       "amResizeNotify" : True
       "amTrackData"    : True
       "amJust"         : just
@@ -5574,10 +5654,10 @@ begin
   amres = get_res_eq(res2,"am")           ; Get annomanager resources.
   attsetvalues_check(am_ids(0),amres)     ; Set annomanager resources.
 
-  if(xrank.gt.1) then
-    return(onedtond(am_ids(0:len-1),xsizes))
+  if(contains_missing) then
+    return(am_ids(0:len-1))
   else
-    return(onedtond(am_ids(0:len-1),ysizes))
+    return(onedtond(am_ids(0:len-1),new_dims))
   end if
 end
 
@@ -6071,7 +6151,7 @@ begin
     else
       panel_labelbar = False
     end if
-  else if(plot@plot_type.eq."streamline") then
+  elseif(plot@plot_type.eq."streamline") then
     getvalues plot
       "stMonoLineColor"  : mono_line_color
     end getvalues
@@ -6092,7 +6172,6 @@ begin
     end if
   else
   end if
-  end if
   if(.not.isvar("fill_scales")) then
     fill_scales = -1
   end if
@@ -6107,6 +6186,23 @@ begin
 ; routine, telling it to remove the first and last colors.
 ;
   subset_stuff = True
+
+;---If no panel labelbar is possible, then the return values are meaningless.
+  if(.not.panel_labelbar) then
+    print("get_panel_labelbar_info_from_plot: warning: a panel labelbar has been requested,")
+    print("but this doesn't appear to be a color plot. No labelbar will be drawn.")
+    label_strings = ""
+    colors = -1
+    fill_patterns = -1
+    mono_fill_pat = False
+    mono_fill_scl = False
+    mono_fill_col = False
+    end_style = -1
+    cap_style = -1
+    label_align = -1
+    subset_stuff = False
+  end if
+
   return([/panel_labelbar,label_strings,colors,fill_patterns,fill_scales,\
            mono_fill_col,mono_fill_pat,mono_fill_scl,end_style,cap_style,\
            label_align,subset_stuff/])
@@ -6267,11 +6363,10 @@ begin
     if(y_top.eq.1.) then
       if(isatt(res,"gsnPanelMainPosYF"))
         y_top = min((/1.,res@gsnPanelMainPosYF - 0.03/))
-      else if(isatt(res,"txPosYF"))
+      elseif(isatt(res,"txPosYF"))
         y_top = min((/1.,res@txPosYF - 0.03/))
       else
         y_top = min((/1.,0.96-main_font_hgt/))
-      end if
       end if
     end if
   else
@@ -6424,6 +6519,12 @@ begin
 ;
   new_plot     = get_plot_not_loglin(plot(valid_plot))
   new_plot_lab = get_plot_labelbar(plot(valid_plot))
+
+;---If plot type is unknown or xy, then we can't create a labelbar.
+  if(panel_labelbar.and.(new_plot@plot_type.eq."unknown".or.new_plot@plot_type.eq."xy")) then
+    print("Warning: gsn_panel: unrecognized plot type for getting labelbar information. Ignoring labelbar request.")
+    panel_labelbar = False
+  end if
 ;
 ; Get the font height of a particular plot element, so we can
 ; use this for panel plot elements, like the size of the 
@@ -6434,16 +6535,16 @@ begin
       getvalues new_plot
         "cnInfoLabelFontHeightF" : font_height
       end getvalues
-    else if(new_plot@plot_type.eq."vector") then
+    elseif(new_plot@plot_type.eq."vector") then
       getvalues new_plot
         "vcRefAnnoFontHeightF" : font_height
       end getvalues
-    else if(new_plot@plot_type.eq."xy") then
+    elseif(new_plot@plot_type.eq."xy") then
       getvalues new_plot
         "tiXAxisFontHeightF" : font_height
       end getvalues
       font_height = 0.6*font_height
-    else if(new_plot@plot_type.eq."streamline") then
+    elseif(new_plot@plot_type.eq."streamline") then
 ;
 ; There's no equivalent font height resource for streamline to 
 ; retrieve, so just set it here.
@@ -6451,9 +6552,6 @@ begin
       font_height = 0.01
     else
       font_height = 0.01
-    end if
-    end if
-    end if
     end if
 ;
 ; Use this font height for the panel figure strings, if any, unless
@@ -6798,87 +6896,80 @@ begin
   if(panel_labelbar) then
     lbres@EndStyle = lb_end_style
 ;
-; If plot type is unknown or xy, then we can't get labelbar information.
-;
-    if(new_plot@plot_type.ne."unknown".and.new_plot@plot_type.ne."xy") then
-;
 ; Set labelbar height, width, and font height.
 ;
-      labelbar_height      = scale * labelbar_height
-      labelbar_width       = scale * labelbar_width
-      labelbar_font_height = font_height
+    labelbar_height      = scale * labelbar_height
+    labelbar_width       = scale * labelbar_width
+    labelbar_font_height = font_height
 ;
 ; Set some labelbar resources.  If pmLabelBarWidth/Height are set,
 ; use these no matter what, for the labelbar width and height. Otherwise,
 ; use vpWidth/Height if they are set.
 ;
-      lbres = True
-      if(isatt(lbres,"pmLabelBarWidthF")) then
-        lbres@vpWidthF = get_res_value(lbres,"pmLabelBarWidthF",labelbar_width)
-      else
-        set_attr(lbres,"vpWidthF", labelbar_width)
-      end if
+    lbres = True
+    if(isatt(lbres,"pmLabelBarWidthF")) then
+      lbres@vpWidthF = get_res_value(lbres,"pmLabelBarWidthF",labelbar_width)
+    else
+      set_attr(lbres,"vpWidthF", labelbar_width)
+    end if
         
-      if(isatt(lbres,"pmLabelBarHeightF")) then
-        lbres@vpHeightF = get_res_value(lbres,"pmLabelBarHeightF",labelbar_height)
-      else
-        set_attr(lbres,"vpHeightF",labelbar_height)
-      end if
+    if(isatt(lbres,"pmLabelBarHeightF")) then
+      lbres@vpHeightF = get_res_value(lbres,"pmLabelBarHeightF",labelbar_height)
+    else
+      set_attr(lbres,"vpHeightF",labelbar_height)
+    end if
 ;
 ; Set position of labelbar depending on whether it's horizontal or
 ; vertical.
 ;
-      if(lbhor)
-        set_attr(lbres,"vpYF",max ((/ywsp+labelbar_height,bot-ywsp/)))
-        if(ncols.eq.1.and.lbres@vpWidthF.le.scaled_width)
-          set_attr(lbres,"vpXF",min_xpos + (scaled_width-lbres@vpWidthF)/2.)
-        else
-          tmp_range = x_rgt - x_lft
-          set_attr(lbres,"vpXF",x_lft + (tmp_range - lbres@vpWidthF)/2.)
-        end if
-        lbres@vpYF = lbres@vpYF + get_res_value(lbres,"pmLabelBarOrthogonalPosF",0.)
-        lbres@vpXF = lbres@vpXF + get_res_value(lbres,"pmLabelBarParallelPosF",0.)
+    if(lbhor)
+      set_attr(lbres,"vpYF",max ((/ywsp+labelbar_height,bot-ywsp/)))
+      if(ncols.eq.1.and.lbres@vpWidthF.le.scaled_width)
+        set_attr(lbres,"vpXF",min_xpos + (scaled_width-lbres@vpWidthF)/2.)
       else
-        set_attr(lbres,"vpXF",min ((/1.-(xwsp+labelbar_width),max_rgt+xwsp/)))
-        if(nrows.eq.1.and.lbres@vpHeightF.le.scaled_height)
-          set_attr(lbres,"vpYF",max_ypos-(scaled_height - lbres@vpHeightF)/2.)
-        else
-          tmp_range = y_top - y_bot
-          set_attr(lbres,"vpYF",y_top-(tmp_range - lbres@vpHeightF)/2.)
-        end if
-        lbres@vpXF = lbres@vpXF + get_res_value(lbres,"pmLabelBarOrthogonalPosF",0.)
-        lbres@vpYF = lbres@vpYF + get_res_value(lbres,"pmLabelBarParallelPosF",0.)
+        tmp_range = x_rgt - x_lft
+        set_attr(lbres,"vpXF",x_lft + (tmp_range - lbres@vpWidthF)/2.)
       end if
-      set_attr(lbres,"lbLabelFontHeightF",labelbar_font_height)
+      lbres@vpYF = lbres@vpYF + get_res_value(lbres,"pmLabelBarOrthogonalPosF",0.)
+      lbres@vpXF = lbres@vpXF + get_res_value(lbres,"pmLabelBarParallelPosF",0.)
+    else
+      set_attr(lbres,"vpXF",min ((/1.-(xwsp+labelbar_width),max_rgt+xwsp/)))
+      if(nrows.eq.1.and.lbres@vpHeightF.le.scaled_height)
+        set_attr(lbres,"vpYF",max_ypos-(scaled_height - lbres@vpHeightF)/2.)
+      else
+        tmp_range = y_top - y_bot
+        set_attr(lbres,"vpYF",y_top-(tmp_range - lbres@vpHeightF)/2.)
+      end if
+      lbres@vpXF = lbres@vpXF + get_res_value(lbres,"pmLabelBarOrthogonalPosF",0.)
+      lbres@vpYF = lbres@vpYF + get_res_value(lbres,"pmLabelBarParallelPosF",0.)
+    end if
+    set_attr(lbres,"lbLabelFontHeightF",labelbar_font_height)
 ;
 ; Check if we want different fill patterns or fill scales.  If so, we
 ; have to pass these on to the labelbar.
 ;
-      set_attr(lbres,"lbMonoFillColor",lb_mono_fill_color)
-      if(.not.lb_mono_fill_pattern)
-        set_attr(lbres,"lbMonoFillPattern", False)
-        set_attr(lbres,"lbFillPatterns", lb_fill_patterns)
-      end if
-      if(.not.lb_mono_fill_scale)
-        set_attr(lbres,"lbMonoFillScale", False)
-        set_attr(lbres,"lbFillScales", lb_fill_scales)
-      end if
-      if(isvar("lb_cap_style"))
-        set_attr(lbres,"lbBoxEndCapStyle",lb_cap_style)
-      end if
-      set_attr(lbres,"lbLabelAlignment",lb_label_alignment)
-;      if(isvar("lb_levels"))
-;        lb_label_strings = fix_zero_contour(lb_levels)   ; Make sure level 0 is not something like 1e-8
-;      end if
-      lbres@SubsetStuff = lb_subset_stuff
+    set_attr(lbres,"lbMonoFillColor",lb_mono_fill_color)
+    if(.not.lb_mono_fill_pattern)
+      set_attr(lbres,"lbMonoFillPattern", False)
+      set_attr(lbres,"lbFillPatterns", lb_fill_patterns)
+    end if
+    if(.not.lb_mono_fill_scale)
+      set_attr(lbres,"lbMonoFillScale", False)
+      set_attr(lbres,"lbFillScales", lb_fill_scales)
+    end if
+    if(isvar("lb_cap_style"))
+      set_attr(lbres,"lbBoxEndCapStyle",lb_cap_style)
+    end if
+    set_attr(lbres,"lbLabelAlignment",lb_label_alignment)
+;   if(isvar("lb_levels"))
+;     lb_label_strings = fix_zero_contour(lb_levels)   ; Make sure level 0 is not something like 1e-8
+;   end if
+    lbres@SubsetStuff = lb_subset_stuff
 
 ;---Create the labelbar.
-      newplots(nplot) = create_labelbar(wks,dimsizes(lb_fill_colors),lb_fill_colors, \
-                                        lb_label_strings,lbres)
-      nplot = nplot + 1
-    else
-       print("gsn_panel: Warning: unrecognized plot type for getting labelbar information. Ignoring labelbar request.")
-    end if
+    newplots(nplot) = create_labelbar(wks,dimsizes(lb_fill_colors),lb_fill_colors, \
+                                      lb_label_strings,lbres)
+    nplot = nplot + 1
   end if
 ;
 ; Create the main string, if exists.
@@ -7386,66 +7477,66 @@ begin
   if(attach_y) then
     if(found_base) then
       setvalues new_base
-        "tmYUseLeft"   : get_res_value(res1,"tmYUseLeft",False)
-        "tmYROn"       : get_res_value(res1,"tmYROn",False)
-        "tmYRLabelsOn" : get_res_value(res1,"tmYRLabelsOn",False)
-        "tmYRBorderOn" : get_res_value(res1,"tmYRBorderOn",border_on)
+        "tmYUseLeft"   : get_res_value_keep(res1,"tmYUseLeft",False)
+        "tmYROn"       : get_res_value_keep(res1,"tmYROn",False)
+        "tmYRLabelsOn" : get_res_value_keep(res1,"tmYRLabelsOn",False)
+        "tmYRBorderOn" : get_res_value_keep(res1,"tmYRBorderOn",border_on)
       end setvalues
     end if
     do i=0,nplots-2
       if(found_plots(i)) then
         setvalues new_plots(i)
-          "tmYUseLeft"   : get_res_value(res2,"tmYUseLeft",False)
-          "tmYLOn"       : get_res_value(res2,"tmYLOn",False)
-          "tmYLBorderOn" : get_res_value(res2,"tmYLBorderOn",border_on)
-          "tmYROn"       : get_res_value(res2,"tmYROn",False)
-          "tmYRLabelsOn" : get_res_value(res2,"tmYRLabelsOn",False)
-          "tmYRBorderOn" : get_res_value(res2,"tmYRBorderOn",border_on)
-          "tiYAxisOn"    : get_res_value(res2,"tiYAxisOn",False)
+          "tmYUseLeft"   : get_res_value_keep(res2,"tmYUseLeft",False)
+          "tmYLOn"       : get_res_value_keep(res2,"tmYLOn",False)
+          "tmYLBorderOn" : get_res_value_keep(res2,"tmYLBorderOn",border_on)
+          "tmYROn"       : get_res_value_keep(res2,"tmYROn",False)
+          "tmYRLabelsOn" : get_res_value_keep(res2,"tmYRLabelsOn",False)
+          "tmYRBorderOn" : get_res_value_keep(res2,"tmYRBorderOn",border_on)
+          "tiYAxisOn"    : get_res_value_keep(res2,"tiYAxisOn",False)
         end setvalues
       end if
     end do
     if(found_plots(nplots-1)) then
       setvalues new_plots(nplots-1)
-        "tmYUseLeft"   : get_res_value(res2,"tmYUseLeft",False)
-        "tiYAxisOn"    : get_res_value(res2,"tiYAxisOn",False)
-        "tmYLOn"       : get_res_value(res2,"tmYLOn",False)
-        "tmYLBorderOn" : get_res_value(res2,"tmYLBorderOn",border_on)
-        "tmYLLabelsOn" : get_res_value(res1,"tmYLLabelsOn",False)
+        "tmYUseLeft"   : get_res_value_keep(res2,"tmYUseLeft",False)
+        "tiYAxisOn"    : get_res_value_keep(res2,"tiYAxisOn",False)
+        "tmYLOn"       : get_res_value_keep(res2,"tmYLOn",False)
+        "tmYLBorderOn" : get_res_value_keep(res2,"tmYLBorderOn",border_on)
+        "tmYLLabelsOn" : get_res_value_keep(res2,"tmYLLabelsOn",False)
       end setvalues
     end if
   else
     if(found_base) then
       setvalues new_base
-        "tmXUseBottom" : get_res_value(res1,"tmXUseBottom",False)
-        "tmXBOn"       : get_res_value(res1,"tmXBOn",False)
-        "tmXBBorderOn" : get_res_value(res1,"tmXBBorderOn",border_on)
-        "tmXBLabelsOn" : get_res_value(res1,"tmXBLabelsOn",False)
-        "tiXAxisOn"    : get_res_value(res1,"tiXAxisOn",False)
+        "tmXUseBottom" : get_res_value_keep(res1,"tmXUseBottom",False)
+        "tmXBOn"       : get_res_value_keep(res1,"tmXBOn",False)
+        "tmXBBorderOn" : get_res_value_keep(res1,"tmXBBorderOn",border_on)
+        "tmXBLabelsOn" : get_res_value_keep(res1,"tmXBLabelsOn",False)
+        "tiXAxisOn"    : get_res_value_keep(res1,"tiXAxisOn",False)
       end setvalues
     end if
     do i=0,nplots-2
       if(found_plots(i)) then
         setvalues new_plots(i)
-          "tmXUseBottom" : get_res_value(res2,"tmXUseBottom",False)
-          "tmXBOn"       : get_res_value(res2,"tmXBOn",False)
-          "tmXBBorderOn" : get_res_value(res2,"tmXBBorderOn",border_on)
-          "tmXBLabelsOn" : get_res_value(res2,"tmXBLabelsOn",False)
-          "tmXTOn"       : get_res_value(res2,"tmXTOn",False)
-          "tmXTBorderOn" : get_res_value(res2,"tmXTBorderOn",border_on)
-          "tmXTLabelsOn" : get_res_value(res2,"tmXTLabelsOn",False)
-          "tiMainOn"     : get_res_value(res2,"tiMainOn",False)
-          "tiXAxisOn"    : get_res_value(res2,"tiXAxisOn",False)
+          "tmXUseBottom" : get_res_value_keep(res2,"tmXUseBottom",False)
+          "tmXBOn"       : get_res_value_keep(res2,"tmXBOn",False)
+          "tmXBBorderOn" : get_res_value_keep(res2,"tmXBBorderOn",border_on)
+          "tmXBLabelsOn" : get_res_value_keep(res2,"tmXBLabelsOn",False)
+          "tmXTOn"       : get_res_value_keep(res2,"tmXTOn",False)
+          "tmXTBorderOn" : get_res_value_keep(res2,"tmXTBorderOn",border_on)
+          "tmXTLabelsOn" : get_res_value_keep(res2,"tmXTLabelsOn",False)
+          "tiMainOn"     : get_res_value_keep(res2,"tiMainOn",False)
+          "tiXAxisOn"    : get_res_value_keep(res2,"tiXAxisOn",False)
         end setvalues
       end if
     end do
     if(found_plots(nplots-1)) then
       setvalues new_plots(nplots-1)
-        "tmXUseBottom" : get_res_value(res2,"tmXUseBottom",False)
-        "tmXTOn"       : get_res_value(res2,"tmXTOn",False)
-        "tmXTBorderOn" : get_res_value(res2,"tmXTBorderOn",border_on)
-        "tmXTLabelsOn" : get_res_value(res2,"tmXTLabelsOn",False)
-        "tiMainOn"     : get_res_value(res2,"tiMainOn",False)
+        "tmXUseBottom" : get_res_value_keep(res2,"tmXUseBottom",False)
+        "tmXTOn"       : get_res_value_keep(res2,"tmXTOn",False)
+        "tmXTBorderOn" : get_res_value_keep(res2,"tmXTBorderOn",border_on)
+        "tmXTLabelsOn" : get_res_value_keep(res2,"tmXTLabelsOn",False)
+        "tiMainOn"     : get_res_value_keep(res2,"tiMainOn",False)
       end setvalues
     end if
   end if
@@ -8253,9 +8344,8 @@ begin
   do i = 0, nbars - 1
     if(col_rank.eq.1) then
       gsres@gsFillColor = rgba_arr
-    else if(col_rank.eq.2) then
+    elseif(col_rank.eq.2) then
       gsres@gsFillColor = rgba_arr(i % ncolors,:)
-    end if
     end if
     if(multibars) 
 ;
@@ -11982,22 +12072,26 @@ end
 ;                                                                       ;
 ; This function was written by Adam Phillips, 2006                      ;
 ;                                                                       ;
-; This function was updated July 2013 to allow any combination of       ;
-; gsnShadeLow, gsnShadeMid, and gsnShadeHigh to be set.                 ;
+; Updated July 2013 to allow any combination of gsnShadeLow,            ; 
+; gsnShadeMid, and gsnShadeHigh to be set.                              ;
 ;                                                                       ;
-; This function was updated July 2014 to allow RGB and RGBA values for  ;
-; color. The following are now valid for colors:                        ;    
+; Updated July 2014 to allow RGB and RGBA values for color.             ;
+;    The following types of color specificiations are now allowed:      ;
+;        Color index value:  opt@gsnShadeLow  = 5                       ;
+;        Named color:        opt@gsnShadeHigh = "blue"                  ;
+;        RGB color:          opt@gsnShadeHigh = (/1.,0.,0.5/)           ;
+;        RGBA color:         opt@gsnShadeHigh = (/1.,0.,0.5,0.5/)       ;
 ;                                                                       ;
-;  Color index value:  opt@gsnShadeLow  = 5                             ;
-;  Named color:        opt@gsnShadeHigh = "blue"                        ;
-;  RGB color:          opt@gsnShadeHigh = (/1.,0.,0.5/)                 ;
-;  RGBA color:         opt@gsnShadeHigh = (/1.,0.,0.5,0.5/)             ;
+; Updated March 2017 to added resources to control pattern density and  ;
+; fill dot size.                                                        ;
+;                                                                       ;
 ;***********************************************************************;
 undef("gsn_contour_shade")
 function gsn_contour_shade(plot:graphic,lowval:numeric,highval:numeric,\
                            opt:logical) 
 local shaden_set, shadem_set, shadep_set, shaden, shadep, shadem, ovrly_ids, \
-idstringcnlvls, colist, i, N, tmp_wks
+idstring, cnlvls, colors, patterns, lmh_fill_scales, fill_scales,i, nlevels, tmp_wks, \
+def_fill_scale, def_dot_size, dot_size
 begin
    if (.not.opt) then
      print("gsn_contour_shade: Options list must be used as one of the following option resources must be set: opt@gsnShadeLow, opt@gsnShadeHigh, opt@gsnShadeMid.")
@@ -12011,6 +12105,73 @@ begin
      print("gsn_contour_shade: gsnShadeFillType can only be 'pattern' or 'color'.")
      print("   Returning without making any changes to plot.")
      return(plot)
+   end if
+
+   debug = get_res_value_keep(opt,"debug",False)
+
+;
+; Get the contour plot object so we can retrieve and set
+; resource information for it. I'm not sure why 
+; a contour plot has an overlay contour plot?  That is,
+; why does this code work when you call gsn_csm_contour,
+; because I would think gsn_csm_contour would not have an
+; overlay id that is another contour plot. Need to check
+; with Dave on this.
+;
+   getvalues plot
+     "pmOverlaySequenceIds" : ovrly_ids
+   end getvalues
+   do n=0,dimsizes(ovrly_ids)-1
+     if(NhlClassName(ovrly_ids(n)).eq."contourPlotClass") then
+       idstring = ovrly_ids(n)
+       break
+    end if
+   end do
+
+;---Get default values of fill pattern resources
+   getvalues idstring
+      "cnFillScaleF"   : def_fill_scale
+      "cnFillDotSizeF" : def_dot_size
+      "cnLevels"       : cnlvls
+   end getvalues
+
+;---Make sure we have contour levels
+   nlevels = dimsizes(cnlvls)
+   if (ismissing(nlevels) .or. nlevels.le.0) then
+       print ("gsn_contour_shade: dimsizes(cnlvls)="+nlevels+" return (non-fatal)")
+       return (plot)
+   end if
+
+   if(debug)
+     print("def_fill_scale = " + def_fill_scale)
+     print("def_dot_size   = " + def_dot_size)
+     print("cnlvls         = " + str_join(""+cnlvls,","))
+  end if
+
+  if(check_attr(opt,"printcnlevels",True,True))
+    print(cnlvls)
+  end if
+
+;
+; gsnShadeFillScales allows you to set the fill scale for the low, mid, or high
+; contour levels. This resource must be set to three elements to represent
+; the three levels. Otherwise, you can set the single gsnShadeFillScaleF if
+; you want the same fill scale to be applied to one or more levels.
+;
+   dot_size = get_res_value_keep(opt,"gsnShadeFillDotSizeF",def_dot_size)
+   if(opt.and.isatt(opt,"gsnShadeFillScales")) then
+     lmh_fill_scales = opt@gsnShadeFillScales
+     scale_dims = dimsizes(lmh_fill_scales)
+     scale_rank = dimsizes(scale_dims)
+     if(scale_rank.ne.1.or.(scale_dims.ne.1.and.scale_dims.ne.3))
+       print("gsn_contour_shade: gsnShadeFillScales can either be a scalar")
+       print("     or an array of three elements representing the fill scales")
+       print("     for gsnShadeLow, gsnShadeMid, and gsnShadeHigh fill patterns.")
+       print("     Will default to " + def_fill_scale)
+       lmh_fill_scales := conform_dims(3,def_fill_scale,-1)
+     end if
+   else
+     lmh_fill_scales = conform_dims(3,get_res_value_keep(opt,"gsnShadeFillScaleF",def_fill_scale),-1)
    end if
 
 ;----------------------------------------------------------------------
@@ -12102,54 +12263,28 @@ begin
      return(plot)
    end if
 
-   getvalues plot
-      "pmOverlaySequenceIds" : ovrly_ids
-   end getvalues
-   if (.not.any(ismissing(ovrly_ids))) then
-     do i=0,dimsizes(ovrly_ids)-1
-         if (NhlClassName(ovrly_ids(i)).eq."contourPlotClass")
-            idstring = ovrly_ids(i)
-	    end if
-      end do
-   end if 
-   getvalues idstring
-     "cnLevels"  : cnlvls
-   end getvalues
-
-   if ((isatt(opt,"printcnlevels"))) then
-      if (opt@printcnlevels) then
-	    print(cnlvls)
-	 end if
-   end if
-
-;---Make sure we have contour levels
-   N = dimsizes(cnlvls)
-   if (ismissing(N) .or. N.le.0) then
-       print ("gsn_contour_shade: dimsizes(cnlvls)="+N+" return (non-fatal)")
-       return (plot)
-   end if
-
 ;---Create array for fill, set all to transparent or white
    if(shade_type.eq."color") then
-     colist      = new((/N+1,4/),double)
-     colist      = 1.d     ; initialize to all white so no missing values are used
-     colist(:,3) = 0.      ; now set all colors to transparent.
+     colors      = new((/nlevels+1,4/),double)
+     colors      = 1.d     ; initialize to all white so no missing values are used
+     colors(:,3) = 0.      ; now set all colors to transparent.
    else
-     colist = new(N+1,integer)
-     colist = -1
+     patterns    = new(nlevels+1,integer)
+     patterns    = -1
+     fill_scales = new(nlevels+1,float)
    end if
 
-;---Start filling colist
+;---Start filling colors or patterns
    if (shaden_set.and.any(cnlvls.le.lowval)) then
      ii := ind(cnlvls.le.lowval)
      ii_dims = dimsizes(ii)
      if(shade_type.eq."pattern") then
-       colist(ii) = shaden
-     else if(ii_dims.eq.1) then
-       colist(ii,:) = shaden
+       patterns(ii)    = shaden
+       fill_scales(ii) = lmh_fill_scales(0)
+     elseif(ii_dims.eq.1) then
+       colors(ii,:) = shaden
      else
-       colist(ii,:) = conform(colist(ii,:),shaden,1)
-     end if
+       colors(ii,:) = conform(colors(ii,:),shaden,1)
      end if
    end if
 
@@ -12157,25 +12292,25 @@ begin
      ii := ind(cnlvls.ge.highval)+1
      ii_dims = dimsizes(ii)
      if(shade_type.eq."pattern") then
-       colist(ii) = shadep
-     else if(ii_dims.eq.1) then
-       colist(ii,:) = shadep
+       patterns(ii)    = shadep
+       fill_scales(ii) = lmh_fill_scales(2)
+     elseif(ii_dims.eq.1) then
+       colors(ii,:) = shadep
      else
-       colist(ii,:) = conform(colist(ii,:),shadep,1)
+       colors(ii,:) = conform(colors(ii,:),shadep,1)
      end if
-   end if
    end if
 
    if (shadem_set.and.any(cnlvls.ge.lowval.and.cnlvls.le.highval)) then
      ii := ind(cnlvls.ge.lowval.and.cnlvls.le.highval)
      ii_dims = dimsizes(ii)
      if(shade_type.eq."pattern") then
-       colist(ii) = shadem
-     else if (ii_dims.ge.2) then
-       colist(ii(1:),:) = conform(colist(ii(1:),:),shadem,1)
+       patterns(ii)    = shadem
+       fill_scales(ii) = lmh_fill_scales(1)
+     elseif (ii_dims.ge.2) then
+       colors(ii(1:),:) = conform(colors(ii(1:),:),shadem,1)
      else
        print("gsn_contour_shade: 1 contour level or less found between "+lowval+" and "+highval+", not color filling")
-     end if
      end if
    end if
 
@@ -12184,20 +12319,31 @@ begin
 	    "cnFillOn"          : True
             "cnMonoFillPattern" : True
             "cnMonoFillColor"   : False
-            "cnFillColors"      : colist			   
+            "cnFillColors"      : colors			   
 	 end setvalues
    else
 	 setvalues idstring               
 	    "cnFillOn"          : True
             "cnMonoFillColor"   : True
             "cnMonoFillPattern" : False
-            "cnFillPatterns"    : colist	   
+            "cnMonoFillScale"   : False
+            "cnFillPatterns"    : patterns	   
+            "cnFillDotSizeF"    : dot_size
+            "cnFillScales"      : fill_scales
 	 end setvalues
    end if
    return (plot)
 end
-undef("fill_res")
-procedure fill_res(res1:logical,res2:logical,ncr[2]:integer,attnames[*]:string)
+
+;----------------------------------------------------------------------
+; This procedure is currently only used by gsn_table, and is meant
+; to propagate scalar resources to nrows x ncols sets of resources
+; for drawing each cell of a table. We really only want to do this for
+; txXXXX and gsFill resources and not gsLine.
+;----------------------------------------------------------------------
+undef("table_fill_res")
+procedure table_fill_res(res1:logical,res2:logical,ncr[2]:integer,\
+                         attnames[*]:string)
 local natts, i, dsizes, rank, success, nrows, ncols
 begin
   nrows = ncr(0)
@@ -12212,7 +12358,7 @@ begin
 ; have to check each attribute for the right size.
 ;
     do i=0,natts-1
-      if(isatt(res1,attnames(i))) then
+      if(isatt(res1,attnames(i)).and..not.isStrSubset(attnames(i),"gsLine")) then
 ;
 ; Get the dimension size and rank of this attribute.
 ;
@@ -12349,7 +12495,7 @@ begin
 ;
   res2     = False
   attnames = getvaratts(res)
-  fill_res(res,res2,ncr,attnames)
+  table_fill_res(res,res2,ncr,attnames)
   delete(attnames)                    ; We're going to use this later.
 
 ;
@@ -12358,8 +12504,6 @@ begin
   xsize = (x(1) - x(0))/ncols         ; width of grid cell
   ysize = (y(1) - y(0))/nrows         ; height of grid cell
 
-  lnres = get_res_eq(res2,"gs")       ; Resource list for lines.
-
 ;
 ; Check for a box fill color.
 ;
@@ -12367,6 +12511,10 @@ begin
   if(isatt(res2,"gsFillColor").or.isatt(res2,"gsFillIndex")) then
     fill_on = True
   end if
+
+  gsres_tmp = get_res_eq(res2,"gs")           ; Get resource list for lines. Remove gsFill
+  lnres     = get_res_ne(gsres_tmp,"gsFill")  ; resources so they don't get passed to gsn_polyline.
+  delete(gsres_tmp)
 
 ;
 ; Check for desired filling of each grid cell. Do this before drawing
@@ -12396,8 +12544,10 @@ begin
   end if
 
 ; Draw horizontal lines, top to bottom.
+
   do nr = 0,nrows
     ypos = y(1) - (nr * ysize)
+    ii = nr*ncols
     gsn_polyline_ndc(wks,(/x(0),x(1)/),(/ypos,ypos/),lnres)
 
     if(debug) then
