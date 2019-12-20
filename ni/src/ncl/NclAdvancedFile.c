@@ -2320,7 +2320,11 @@ NclFileVarNode *_getVarNodeFromNclFileGrpNode(NclFileGrpNode *grpnode,
     int is_fully_qualified;
     NclFileGrpNode *lgrpnode = grpnode;
     char *vname = NrmQuarkToString(varname);
-    char *buf = alloca(strlen(vname) + 1);
+    char *buf = malloc(strlen(vname) + 1);
+    if(buf == NULL) {
+        NHLPERROR((NhlFATAL,NhlEUNKNOWN,"_getVarNodeFromNclFileGrpNode: Cannot allocate memory for temporary string\n"));
+        return(-1);
+    }
     NrmQuark lvarname = varname;
     
     buf[0] = '\0';
@@ -2341,6 +2345,8 @@ NclFileVarNode *_getVarNodeFromNclFileGrpNode(NclFileGrpNode *grpnode,
         return varnode;
 
     varnode = _getVarNodeFromNclFileGrpNode_asCompound(lgrpnode, lvarname);
+
+    free(buf);
     return varnode;
 }
 

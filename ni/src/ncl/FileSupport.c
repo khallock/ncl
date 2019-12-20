@@ -35,7 +35,6 @@ short    NCLuseAFS;
 
 #include <ctype.h>
 #include <unistd.h>
-#include <alloca.h>
 #include <netcdf.h>
 
 #ifdef BuildHDF4
@@ -3834,7 +3833,12 @@ NclQuark _NclVerifyFile(NclQuark the_path, NclQuark pre_file_ext_q, short *use_a
 	int n = -1;
 	int sizeofextlist = sizeof(ext_list) / sizeof(ext_list[0]);
 
-	char *filename = (char*) alloca(strlen(NrmQuarkToString(the_path)) + 1);
+	char *filename = (char*) malloc(strlen(NrmQuarkToString(the_path)) + 1);
+	if(filename == NULL)
+	{
+		NHLPERROR((NhlFATAL,NhlEUNKNOWN,"_NclVerifyFile: Cannot allocate memory for temporary string\n"));
+		return(-1);
+	}
 	struct stat buf;
 
 	if (_NclFormatEqual(NrmStringToQuark("grb"),file_ext_q)) {
@@ -3880,8 +3884,13 @@ NclQuark _NclVerifyFile(NclQuark the_path, NclQuark pre_file_ext_q, short *use_a
 
 	if(stat(_NGResolvePath(filename),&buf) == -1)
 	{
-		char *tmp_path = (char*) alloca(strlen(filename) + 1); 
-		char *tmp_name = (char*) alloca(strlen(NrmQuarkToString(pre_file_ext_q)) + 1);
+		char *tmp_path = (char*) malloc(strlen(filename) + 1);
+		char *tmp_name = (char*) malloc(strlen(NrmQuarkToString(pre_file_ext_q)) + 1);
+		if ( tmp_path == NULL || tmp_name == NULL )
+		{
+			NHLPERROR((NhlFATAL,NhlEUNKNOWN,"_NclVerifyFile: Cannot allocate memory for temporary strings\n"));
+			return(-1);
+		}
 		strcpy(tmp_path, filename);
 		strcpy(tmp_name, NrmQuarkToString(pre_file_ext_q));
 		tmp_path[strlen(filename) - strlen(tmp_name) - 1] = '\0';
@@ -3893,6 +3902,8 @@ NclQuark _NclVerifyFile(NclQuark the_path, NclQuark pre_file_ext_q, short *use_a
 			return(-1);
 		}
 		strcpy(filename, tmp_path);
+		free(tmp_path);
+		free(tmp_name);
 	}
 
 	for(n = -1; n < sizeofextlist; n++)
@@ -4104,6 +4115,7 @@ NclQuark _NclVerifyFile(NclQuark the_path, NclQuark pre_file_ext_q, short *use_a
 		}
 #endif
 	}
+	free(filename);
 	if (!found)
 		return -1;
 
@@ -4182,7 +4194,12 @@ NclFile _NclOpenFile(NclObj inst, NclObjClass theclass, NclObjTypes obj_type,
 				file_ext_q = _NclVerifyFile(the_real_path, old_file_ext_q, &use_advanced_file_structure);
 			else
 			{
-				char *tmp_path = (char*) alloca(strlen(NrmQuarkToString(the_real_path)) + 1);  
+				char *tmp_path = (char*) malloc(strlen(NrmQuarkToString(the_real_path)) + 1);
+				if ( tmp_path == NULL )
+				{
+					NHLPERROR((NhlFATAL,NhlEUNKNOWN,"_NclOpenFile: Cannot allocate memory for temporary string\n"));
+					return(-1);
+				}
 				char *ext_name;
 				strcpy(tmp_path, NrmQuarkToString(the_real_path));
 
@@ -4203,7 +4220,7 @@ NclFile _NclOpenFile(NclObj inst, NclObjClass theclass, NclObjTypes obj_type,
 					return file_out;
 				}
 				the_real_path = NrmStringToQuark(tmp_path);
-
+				free(tmp_path);
 			}
 
 			if(0 > file_ext_q)
